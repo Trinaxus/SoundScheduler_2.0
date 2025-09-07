@@ -3,7 +3,7 @@ import { Play, Pause, X, Clock, Edit, Save } from 'lucide-react';
 import { useSounds } from '../context/SoundContext';
 import { formatFileSize, formatDuration, formatTime } from '../utils/helpers';
 import ScheduleEditor from './ScheduleEditor';
-import { API_BASE } from '../lib/api';
+// Cover removed: no API_BASE required
 
 const SoundList: React.FC = () => {
   const {
@@ -82,24 +82,7 @@ const SoundList: React.FC = () => {
         <React.Fragment key={sound.id}>
           <div className="bg-white/10 backdrop-blur-sm rounded-lg overflow-hidden hover:bg-white/20 transition-all">
             <div className="flex items-center p-4">
-              <div className="flex-shrink-0 mr-3">
-                {/* Cover */}
-                <div className="w-12 h-12 rounded-md overflow-hidden bg-black/30 flex items-center justify-center">
-                  <img
-                    src={`${API_BASE}/cover.php?file=${encodeURIComponent(sound.url.split('/').pop() || '')}`}
-                    alt="cover"
-                    className="w-full h-full object-cover hidden"
-                    onLoad={(e) => {
-                      e.currentTarget.classList.remove('hidden');
-                      const sib = e.currentTarget.nextElementSibling as HTMLElement | null;
-                      if (sib) sib.style.display = 'none';
-                    }}
-                    onError={(e) => (e.currentTarget.style.display = 'none')}
-                  />
-                  <div className="text-xs text-[#909296]">♪</div>
-                </div>
-              </div>
-              <div className="flex-shrink-0">
+              <div className="flex-shrink-0 mr-4">
                 {currentlyPlaying === sound.id ? (
                   <button
                     onClick={() => pauseSound()}
@@ -119,7 +102,7 @@ const SoundList: React.FC = () => {
                 )}
               </div>
 
-              <div className="ml-4 flex-1">
+              <div className="ml-0 flex-1 text-left">
                 {editingId === sound.id ? (
                   <div className="flex items-center">
                     <input

@@ -1,10 +1,10 @@
-import React, { useState, useMemo } from 'react';
-import { Clock, Play, Pause, VolumeX, Volume1, Plus, Star, X } from 'lucide-react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { Clock, Play, Pause, VolumeX, Volume1, Plus, Star, X, Settings } from 'lucide-react';
 import { useSounds } from '../context/SoundContext';
 import { formatTime, formatDuration } from '../utils/helpers';
-import { API_BASE } from '../lib/api';
+import PresetManagerModal, { TimelineSegment as PresetSegment } from './PresetManagerModal';
 
-const SCHEDULE_SEGMENTS = [
+const DEFAULT_SEGMENTS = [
   { id: 'open', title: 'Vor der Session', time: '-18:00:00', startTime: '00:00:00', endTime: '18:00:00' },
   { id: 'soundcheck', title: 'Ankommen & Soundcheck', time: '18:00:00-18:30:00', startTime: '18:00:00', endTime: '18:30:00' },
   { id: 'cover', title: 'Covern', time: '18:30:00-20:15:00', startTime: '18:30:00', endTime: '20:15:00' },
@@ -19,9 +19,12 @@ const TimelineView: React.FC = () => {
   const [selectedTime, setSelectedTime] = useState<string>('');
   const [selectedSound, setSelectedSound] = useState<string | null>(null);
   const [mutedSchedules, setMutedSchedules] = useState<Set<string>>(new Set());
+  const [mutedSegments, setMutedSegments] = useState<Set<string>>(new Set());
   const [showSoundPicker, setShowSoundPicker] = useState(false);
   const [activeSchedule, setActiveSchedule] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [segments, setSegments] = useState(DEFAULT_SEGMENTS);
+  const [showPresetManager, setShowPresetManager] = useState(false);
 
   const now = new Date();
   const currentTime = now.toTimeString().split(' ')[0];
@@ -29,17 +32,28 @@ const TimelineView: React.FC = () => {
   const isTimeInSegment = (time: string, start: string, end: string) => time >= start && time <= end;
   const isPastSegment = (end: string) => currentTime > end;
 
+  // (moved below schedulesBySegment)
+
   const toggleMute = (id: string) => {
     setMutedSchedules(prev => {
       const copy = new Set(prev);
-      copy.has(id) ? copy.delete(id) : copy.add(id);
+      if (copy.has(id)) {
+        copy.delete(id);
+      } else {
+        copy.add(id);
+        // If the currently active schedule is muted, pause immediately
+        if (activeSchedule === id) {
+          pauseSound();
+          setActiveSchedule(null);
+        }
+      }
       return copy;
     });
   };
 
   const schedulesBySegment = useMemo(() => {
     const grouped: Record<string, any[]> = {};
-    SCHEDULE_SEGMENTS.forEach(segment => {
+    segments.forEach(segment => {
       grouped[segment.id] = [];
       sounds.forEach(sound => {
         sound.schedules.forEach(schedule => {
@@ -59,9 +73,33 @@ const TimelineView: React.FC = () => {
       grouped[segment.id].sort((a, b) => a.time.localeCompare(b.time));
     });
     return grouped;
-  }, [sounds, currentTime]);
+  }, [sounds, currentTime, segments]);
 
-  const handlePlaySound = (soundId: string, scheduleId: string) => {
+  // Enforce mute globally: if a sound is playing that belongs to a muted schedule or muted segment, pause it immediately
+  useEffect(() => {
+    if (!currentlyPlaying) return;
+    let mustPause = false;
+    Object.entries(schedulesBySegment).forEach(([segId, items]) => {
+      if (mustPause) return;
+      const segMuted = mutedSegments.has(segId);
+      (items as any[]).forEach((it) => {
+        if (mustPause) return;
+        if (it.soundId === currentlyPlaying) {
+          if (segMuted || mutedSchedules.has(it.id)) {
+            mustPause = true;
+          }
+        }
+      });
+    });
+    if (mustPause) {
+      pauseSound();
+      setActiveSchedule(null);
+    }
+  }, [currentlyPlaying, mutedSchedules, mutedSegments, schedulesBySegment, pauseSound]);
+
+  const handlePlaySound = (soundId: string, scheduleId: string, segmentId: string) => {
+    // Block playback if this entry or its segment is muted
+    if (mutedSchedules.has(scheduleId) || mutedSegments.has(segmentId)) return;
     if (currentlyPlaying === soundId && activeSchedule === scheduleId) {
       pauseSound();
       setActiveSchedule(null);
@@ -93,17 +131,25 @@ const TimelineView: React.FC = () => {
 
   return (
     <div className="space-y-4">
-      {/* Global Add Button */}
-      <div className="flex justify-end mb-4">
+      {/* Top actions: Settings (left) + Add (right) */}
+      <div className="flex justify-end mb-4 gap-2">
+        <button
+          onClick={() => setShowPresetManager(true)}
+          className="p-2 rounded-lg border border-neutral-700 text-neutral-300 hover:bg-neutral-700/50"
+          title="Timeline-Presets verwalten"
+        >
+          <Settings className="w-4 h-4" />
+        </button>
         <button
           onClick={handleGlobalAdd}
           className="p-2 rounded-lg bg-[#4ECBD9]/10 text-[#4ECBD9] hover:bg-[#4ECBD9]/20 transition-colors"
+          title="Sound einplanen"
         >
           <Plus className="h-5 w-5" />
         </button>
       </div>
 
-      {SCHEDULE_SEGMENTS.map(segment => {
+      {segments.map((segment: any) => {
         const items = schedulesBySegment[segment.id] || [];
         const isActive = isTimeInSegment(currentTime, segment.startTime, segment.endTime);
         
@@ -126,6 +172,46 @@ const TimelineView: React.FC = () => {
                     Aktuell
                   </span>
                 )}
+
+      
+              </div>
+
+              {/* Segment mute toggle */}
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    setMutedSegments(prev => {
+                      const copy = new Set(prev);
+                      const turningOn = !copy.has(segment.id);
+                      if (turningOn) {
+                        copy.add(segment.id);
+                        // If active schedule belongs to this segment, pause
+                        if (activeSchedule) {
+                          const isActiveInSegment = (schedulesBySegment[segment.id] || []).some((it: any) => it.id === activeSchedule);
+                          if (isActiveInSegment) {
+                            pauseSound();
+                            setActiveSchedule(null);
+                          }
+                        }
+                      } else {
+                        copy.delete(segment.id);
+                      }
+                      return copy;
+                    });
+                  }}
+                  className={`p-2 rounded-full ${
+                    mutedSegments.has(segment.id)
+                      ? 'bg-[#4ECBD9]/10 text-[#4ECBD9]'
+                      : 'bg-neutral-700 text-[#C1C2C5] hover:bg-neutral-600'
+                  }`}
+                  title={mutedSegments.has(segment.id) ? 'Segment stumm' : 'Segment entstummen'}
+                >
+                  {mutedSegments.has(segment.id) ? (
+                    <VolumeX className="h-4 w-4" />
+                  ) : (
+                    <Volume1 className="h-4 w-4" />
+                  )}
+                </button>
               </div>
             </div>
 
@@ -135,78 +221,73 @@ const TimelineView: React.FC = () => {
                   {items.map(schedule => (
                     <div
                       key={schedule.id}
-                      className="flex items-center justify-between p-3 rounded-lg bg-neutral-700/30"
+                      className="p-3 rounded-lg bg-neutral-700/30"
                     >
-                      <div className="flex items-center min-w-0">
-                        <div className="w-10 h-10 rounded-md overflow-hidden bg-black/30 flex items-center justify-center mr-3">
-                          <img
-                            src={`${API_BASE}/cover.php?file=${encodeURIComponent((schedule.soundUrl || '').split('/').pop() || '')}`}
-                            alt="cover"
-                            className="w-full h-full object-cover hidden"
-                            onLoad={(e) => {
-                              e.currentTarget.classList.remove('hidden');
-                              const sib = e.currentTarget.nextElementSibling as HTMLElement | null;
-                              if (sib) sib.style.display = 'none';
-                            }}
-                            onError={(e) => (e.currentTarget.style.display = 'none')}
-                          />
-                          <div className="text-[10px] text-[#909296]">♪</div>
-                        </div>
-                        <button
-                          onClick={() => handlePlaySound(schedule.soundId, schedule.id)}
-                          className={`p-2 rounded-full mr-3 ${
-                            currentlyPlaying === schedule.soundId && activeSchedule === schedule.id
-                              ? 'bg-[#4ECBD9]/20 text-[#4ECBD9]'
-                              : 'bg-[#4ECBD9]/10 text-[#4ECBD9] hover:bg-[#4ECBD9]/20'
-                          }`}
-                        >
-                          {currentlyPlaying === schedule.soundId && activeSchedule === schedule.id ? (
-                            <Pause className="h-4 w-4" />
-                          ) : (
-                            <Play className="h-4 w-4" />
-                          )}
-                        </button>
-
-                        <div className="min-w-0">
-                          <div className="flex items-center">
-                            <p className="text-sm font-medium text-[#C1C2C5] truncate">
-                              {schedule.soundName}
-                            </p>
-                            {schedule.isFavorite && (
-                              <Star className="h-3 w-3 ml-1 fill-[#F471B5] text-[#F471B5]" />
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <button
+                            onClick={() => handlePlaySound(schedule.soundId, schedule.id, segment.id)}
+                            disabled={mutedSchedules.has(schedule.id) || mutedSegments.has(segment.id)}
+                            title={
+                              mutedSegments.has(segment.id)
+                                ? 'Segment stumm – Wiedergabe blockiert'
+                                : (mutedSchedules.has(schedule.id) ? 'Eintrag stumm – Wiedergabe blockiert' : 'Abspielen/Pausieren')
+                            }
+                            className={`p-2 rounded-full ${
+                              (mutedSchedules.has(schedule.id) || mutedSegments.has(segment.id))
+                                ? 'bg-neutral-700 text-neutral-500 cursor-not-allowed'
+                                : (currentlyPlaying === schedule.soundId && activeSchedule === schedule.id
+                                    ? 'bg-[#4ECBD9]/20 text-[#4ECBD9]'
+                                    : 'bg-[#4ECBD9]/10 text-[#4ECBD9] hover:bg-[#4ECBD9]/20')
+                            }`}
+                          >
+                            {currentlyPlaying === schedule.soundId && activeSchedule === schedule.id ? (
+                              <Pause className="h-4 w-4" />
+                            ) : (
+                              <Play className="h-4 w-4" />
                             )}
-                          </div>
-                          <div className="flex items-center space-x-2 text-xs">
-                            <span className="text-[#F471B5]">{formatTime(schedule.time)}</span>
-                            <span className="text-[#909296]">•</span>
-                            <span className="text-[#909296]">{formatDuration(schedule.duration)}</span>
+                          </button>
+                          <div className="min-w-0">
+                            <div className="flex items-center">
+                              <p className="text-sm font-medium text-[#C1C2C5] truncate">
+                                {schedule.soundName}
+                              </p>
+                              {schedule.isFavorite && (
+                                <Star className="h-3 w-3 ml-1 fill-[#F471B5] text-[#F471B5]" />
+                              )}
+                            </div>
+                            <div className="flex items-center space-x-2 text-xs">
+                              <span className="text-[#F471B5]">{formatTime(schedule.time)}</span>
+                              <span className="text-[#909296]">•</span>
+                              <span className="text-[#909296]">{formatDuration(schedule.duration)}</span>
+                            </div>
                           </div>
                         </div>
-                      </div>
 
-                      <div className="flex items-center space-x-2">
-                        <button
-                          onClick={() => toggleMute(schedule.id)}
-                          className={`p-1.5 rounded-full transition-colors ${
-                            mutedSchedules.has(schedule.id)
+                        <div className="flex items-center space-x-2 ml-3">
+                          <button
+                            onClick={() => toggleMute(schedule.id)}
+                            className={`p-1.5 rounded-full transition-colors ${
+                              mutedSchedules.has(schedule.id)
+                                ? 'bg-[#4ECBD9]/10 text-[#4ECBD9]'
+                                : 'bg-neutral-700 text-[#909296] hover:text-[#C1C2C5]'
+                            }`}
+                          >
+                            {mutedSchedules.has(schedule.id) ? (
+                              <VolumeX className="h-4 w-4" />
+                            ) : (
+                              <Volume1 className="h-4 w-4" />
+                            )}
+                          </button>
+                          
+                          <span className={`px-2 py-1 text-xs rounded-full ${
+                            schedule.active
                               ? 'bg-[#4ECBD9]/10 text-[#4ECBD9]'
-                              : 'bg-neutral-700 text-[#909296] hover:text-[#C1C2C5]'
-                          }`}
-                        >
-                          {mutedSchedules.has(schedule.id) ? (
-                            <VolumeX className="h-4 w-4" />
-                          ) : (
-                            <Volume1 className="h-4 w-4" />
-                          )}
-                        </button>
-                        
-                        <span className={`px-2 py-1 text-xs rounded-full ${
-                          schedule.active
-                            ? 'bg-[#4ECBD9]/10 text-[#4ECBD9]'
-                            : 'bg-neutral-700 text-[#909296]'
-                        }`}>
-                          {schedule.active ? 'Aktiv' : 'Inaktiv'}
-                        </span>
+                              : 'bg-neutral-700 text-[#909296]'
+                          }`}>
+                            {schedule.active ? 'Aktiv' : 'Inaktiv'}
+                          </span>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -219,7 +300,7 @@ const TimelineView: React.FC = () => {
 
       {showSoundPicker && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-neutral-800 rounded-xl border border-neutral-700 w-full max-w-3xl max-h-[80vh] overflow-hidden">
+          <div className="bg-neutral-800 rounded-xl border border-neutral-700 w-full max-w-3xl max-h-[80vh] overflow-hidden flex flex-col">
             <div className="p-6 border-b border-neutral-700 flex justify-between items-center">
               <div>
                 <h3 className="text-lg font-medium text-[#C1C2C5]">
@@ -242,7 +323,7 @@ const TimelineView: React.FC = () => {
               </button>
             </div>
 
-            <div className="p-6 space-y-6">
+            <div className="p-6 space-y-6 flex-1 overflow-y-auto">
               <div className="flex flex-col space-y-2">
                 <div className="flex items-center space-x-4">
                   <input
@@ -264,7 +345,7 @@ const TimelineView: React.FC = () => {
                 )}
               </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-[400px] overflow-y-auto p-1">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-1">
                 {sounds.map(sound => (
                   <button
                     key={sound.id}
@@ -275,16 +356,7 @@ const TimelineView: React.FC = () => {
                         : 'bg-neutral-700/50 hover:bg-neutral-700 border border-transparent'
                     } transition-all relative group`}
                   >
-                    <div className="flex-none w-12 h-12 rounded-md overflow-hidden bg-black/30">
-                      <img
-                        src={`${API_BASE}/cover.php?file=${encodeURIComponent((sound.url || '').split('/').pop() || '')}`}
-                        alt="cover"
-                        className="block w-full h-full object-cover hidden"
-                        onLoad={(e) => { e.currentTarget.classList.remove('hidden'); }}
-                        onError={(e) => (e.currentTarget.style.display = 'none')}
-                      />
-                    </div>
-                    <div className="ml-3 text-left min-w-0">
+                    <div className="ml-0 text-left min-w-0">
                       <span className="block text-sm text-[#C1C2C5] truncate">{sound.name}</span>
                       <span className="text-xs text-[#909296]">{formatDuration(sound.duration)}</span>
                     </div>
@@ -306,7 +378,7 @@ const TimelineView: React.FC = () => {
               </div>
             </div>
 
-            <div className="p-6 border-t border-neutral-700 flex justify-end space-x-3">
+            <div className="p-6 border-t border-neutral-700 flex justify-end gap-3 flex-wrap">
               <button
                 onClick={() => {
                   setShowSoundPicker(false);
@@ -333,6 +405,24 @@ const TimelineView: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Preset Manager */}
+      <PresetManagerModal
+        open={showPresetManager}
+        onClose={() => setShowPresetManager(false)}
+        currentSegments={segments.map(s => ({ id: s.id, title: s.title, startTime: s.startTime, endTime: s.endTime })) as PresetSegment[]}
+        onApply={(newSegs) => {
+          const mapped = newSegs.map((s, idx) => ({
+            id: s.id || `seg-${idx}`,
+            title: s.title,
+            time: `${s.startTime}-${s.endTime}`,
+            startTime: s.startTime,
+            endTime: s.endTime,
+          }));
+          setSegments(mapped);
+          setMutedSegments(new Set());
+        }}
+      />
     </div>
   );
 };

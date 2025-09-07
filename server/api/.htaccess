@@ -14,6 +14,8 @@
   SetEnvIfNoCase Origin "^http://127.0.0.1:5173$" ORIGIN_OK=1
   SetEnvIfNoCase Origin "^https://tonbandleipzig\.de$" ORIGIN_OK=1
   SetEnvIfNoCase Origin "^https://tonbandleipzig\.de\.w01fc61e\.kasserver\.com$" ORIGIN_OK=1
+  SetEnvIfNoCase Origin "^https://app\.tonbandleipzig\.de$" ORIGIN_OK=1
+  SetEnvIfNoCase Origin "^https://app-sound-scheduler\.tonbandleipzig\.de$" ORIGIN_OK=1
   # Vercel app domains (project and previews)
   SetEnvIfNoCase Origin "^https://sound-scheduler-2-0\.vercel\.app$" ORIGIN_OK=1
   SetEnvIfNoCase Origin "^https://[a-z0-9-]+\.vercel\.app$" ORIGIN_OK=1

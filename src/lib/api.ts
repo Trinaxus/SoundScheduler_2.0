@@ -192,3 +192,28 @@ export async function categoriesDelete(id: string, version?: number) {
 export async function categoriesGet() {
   return apiGet<{ version: number; categories: Array<any> }>(`/categories.php`);
 }
+
+// --- Timeline Presets ---
+export type TimelinePreset = {
+  id: string;
+  name: string;
+  segments: Array<{ id: string; title: string; startTime: string; endTime: string }>;
+};
+
+export async function presetsList() {
+  return apiGet<{ presets: TimelinePreset[] }>(`/presets.php?action=list`);
+}
+
+export async function presetsUpsert(preset: TimelinePreset) {
+  const form = new FormData();
+  form.append('id', preset.id);
+  form.append('name', preset.name);
+  form.append('segments', JSON.stringify(preset.segments));
+  return apiPost<{ ok: true; preset: TimelinePreset }>(`/presets.php?action=upsert`, form);
+}
+
+export async function presetsDelete(id: string) {
+  const form = new FormData();
+  form.append('id', id);
+  return apiPost<{ ok: true }>(`/presets.php?action=delete`, form);
+}

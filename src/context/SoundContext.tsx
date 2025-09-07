@@ -37,6 +37,7 @@ interface SoundContextType {
   markSchedulePlayed: (soundId: string, scheduleId: string) => void;
   toggleFavorite: (soundId: string) => Promise<void>;
   setSoundCategory: (soundId: string, categoryId: string | null) => Promise<void>;
+  toggleHiddenCategory: (soundId: string) => Promise<void>;
   addCategory: (name: string) => Promise<void>;
   renameCategory: (id: string, name: string) => Promise<void>;
   deleteCategory: (id: string) => Promise<void>;
@@ -468,9 +469,30 @@ export const SoundProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (!sound) return;
 
       const newFavoriteState = !sound.isFavorite;
-      const res = await soundsUpdate({ id: soundId, is_favorite: newFavoriteState }, manifestVersion ?? undefined);
-      setManifestVersion(res.version);
+      // 1) Toggle favorite flag
+      const resFav = await soundsUpdate({ id: soundId, is_favorite: newFavoriteState }, manifestVersion ?? undefined);
+      setManifestVersion(resFav.version);
 
+      // 2) If marked as favorite, ensure category 'Favoriten' exists and assign it
+      if (newFavoriteState) {
+        // Try to find existing 'Favoriten' category (case-insensitive)
+        let favCat = categories.find(c => c.name.toLowerCase() === 'favoriten');
+        if (!favCat) {
+          const created = await categoriesInsert({ name: 'Favoriten' }, resFav.version);
+          favCat = created.category;
+          setManifestVersion(created.version);
+          setCategories(prev => [...prev, favCat!]);
+        }
+        if (favCat) {
+          const resAssign = await soundsUpdate({ id: soundId, category_id: favCat.id }, favCat ? undefined : undefined);
+          // Update local state: favorite flag + categoryId
+          setManifestVersion(resAssign.version ?? resFav.version);
+          setSounds(prev => prev.map(s => s.id === soundId ? { ...s, isFavorite: true, categoryId: favCat!.id } : s));
+          return;
+        }
+      }
+
+      // Default local state update (for unfavorite or if category assign skipped)
       setSounds(prevSounds =>
         prevSounds.map(s =>
           s.id === soundId
@@ -482,7 +504,7 @@ export const SoundProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       console.error('Error toggling favorite:', error);
       throw error;
     }
-  }, [sounds, manifestVersion]);
+  }, [sounds, manifestVersion, categories]);
 
   // --- Categories ---
   const setSoundCategory = useCallback(async (soundId: string, categoryId: string | null): Promise<void> => {
@@ -495,6 +517,30 @@ export const SoundProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       throw e;
     }
   }, [manifestVersion]);
+
+  // Toggle "Ausgeblendet" category: if sound is already in it, remove category; otherwise ensure it exists and assign
+  const toggleHiddenCategory = useCallback(async (soundId: string): Promise<void> => {
+    try {
+      const sound = sounds.find(s => s.id === soundId);
+      if (!sound) return;
+      // Find or create 'Ausgeblendet'
+      let hiddenCat = categories.find(c => c.name.toLowerCase() === 'ausgeblendet');
+      if (!hiddenCat) {
+        const created = await categoriesInsert({ name: 'Ausgeblendet' }, manifestVersion ?? undefined);
+        hiddenCat = created.category;
+        setManifestVersion(created.version);
+        setCategories(prev => [...prev, hiddenCat!]);
+      }
+      if (!hiddenCat) return;
+      const nextCategory = sound.categoryId === hiddenCat.id ? null : hiddenCat.id;
+      const res = await soundsUpdate({ id: soundId, category_id: nextCategory }, manifestVersion ?? undefined);
+      setManifestVersion(res.version);
+      setSounds(prev => prev.map(s => s.id === soundId ? { ...s, categoryId: nextCategory } : s));
+    } catch (e) {
+      console.error('Error toggling hidden category', e);
+      throw e;
+    }
+  }, [sounds, categories, manifestVersion]);
 
   const addCategory = useCallback(async (name: string): Promise<void> => {
     const res = await categoriesInsert({ name }, manifestVersion ?? undefined);
@@ -550,6 +596,7 @@ export const SoundProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     markSchedulePlayed,
     toggleFavorite,
     setSoundCategory,
+    toggleHiddenCategory,
     addCategory,
     renameCategory,
     deleteCategory,

@@ -110,20 +110,17 @@ const SoundManagerPanel: React.FC = () => {
               <SoundUploader />
             </div>
             <div>
-              <h2 className="text-neutral-300 text-sm font-medium mb-4">Sounds</h2>
               <SoundList />
             </div>
           </>
         )}
         {activeTab === 'timeline' && (
           <div>
-            <h2 className="text-neutral-300 text-sm font-medium mb-4">Timeline</h2>
             <TimelineView />
           </div>
         )}
         {activeTab === 'soundboard' && (
           <div>
-            <h2 className="text-neutral-300 text-sm font-medium mb-4">Soundboard</h2>
             <SoundboardView />
           </div>
         )}

@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { X, Plus, Edit2, Trash2, Check, Play, Pause, Star } from 'lucide-react';
+import { X, Plus, Edit2, Trash2, Check, Play, Pause, Star, StopCircle } from 'lucide-react';
 import { useSounds } from '../context/SoundContext';
 
 interface Props {
@@ -19,6 +19,7 @@ const CategoryManagerModal: React.FC<Props> = ({ open, onClose }) => {
     pauseSound,
     currentlyPlaying,
     toggleFavorite,
+    toggleHiddenCategory,
   } = useSounds();
 
   const [newCat, setNewCat] = useState('');
@@ -42,15 +43,15 @@ const CategoryManagerModal: React.FC<Props> = ({ open, onClose }) => {
 
   return (
     <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
-      <div className="w-full max-w-5xl bg-neutral-800 rounded-xl border border-neutral-700 overflow-hidden">
-        <div className="flex items-center justify-between p-4 border-b border-neutral-700">
+      <div className="w-full max-w-5xl max-h-[80vh] bg-neutral-800 rounded-xl border border-neutral-700 overflow-hidden flex flex-col">
+        <div className="flex items-center justify-between p-4 border-b border-neutral-700 shrink-0">
           <h3 className="text-[#C1C2C5] text-lg font-medium">Kategorien verwalten</h3>
           <button onClick={onClose} className="p-2 text-neutral-400 hover:text-white" aria-label="Schließen">
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-0">
+        <div className="grid grid-cols-1 md:[grid-template-columns:300px_minmax(0,1fr)] gap-0 flex-1 overflow-y-auto">
           {/* Left: Category CRUD */}
           <div className="p-4 border-b md:border-b-0 md:border-r border-neutral-700">
             <h4 className="text-sm font-medium text-[#C1C2C5] mb-3">Kategorien</h4>
@@ -141,7 +142,7 @@ const CategoryManagerModal: React.FC<Props> = ({ open, onClose }) => {
           {/* Right: Assignment */}
           <div className="p-4">
             <h4 className="text-sm font-medium text-[#C1C2C5] mb-3">Zuweisung</h4>
-            <div className="space-y-2 max-h-[560px] overflow-auto pr-1">
+            <div className="space-y-2 pr-1">
               {sounds.map((s) => (
                 <div key={s.id} className="flex items-center justify-between bg-neutral-700/20 rounded-lg px-3 py-2">
                   <div className="flex items-center gap-3 min-w-0 mr-3">
@@ -164,6 +165,18 @@ const CategoryManagerModal: React.FC<Props> = ({ open, onClose }) => {
                       aria-label="Favorit umschalten"
                     >
                       <Star className={`w-4 h-4 ${s.isFavorite ? 'fill-[#F471B5] text-[#F471B5]' : 'text-neutral-400'}`} />
+                    </button>
+                    <button
+                      onClick={async () => { await toggleHiddenCategory(s.id); }}
+                      className="p-1.5 rounded-full hover:bg-neutral-700"
+                      aria-label="In/aus 'Ausgeblendet' verschieben"
+                      title={(s.categoryId && (categories.find(c=>c.id===s.categoryId)?.name||'').toLowerCase()==='ausgeblendet') ? 'Aus "Ausgeblendet" entfernen' : 'In "Ausgeblendet" verschieben'}
+                    >
+                      <StopCircle className={`w-4 h-4 ${
+                        (s.categoryId && (categories.find(c=>c.id===s.categoryId)?.name||'').toLowerCase()==='ausgeblendet')
+                          ? 'text-[#F87171]'
+                          : 'text-neutral-400'
+                      }`} />
                     </button>
                     <div className="min-w-0">
                       <p className="text-sm text-[#C1C2C5] truncate">{s.name}</p>
@@ -193,7 +206,7 @@ const CategoryManagerModal: React.FC<Props> = ({ open, onClose }) => {
           </div>
         </div>
 
-        <div className="p-3 border-t border-neutral-700 flex justify-end">
+        <div className="p-3 border-t border-neutral-700 flex justify-end shrink-0">
           <button onClick={onClose} className="px-4 py-2 text-sm text-[#C1C2C5] hover:text-white">Schließen</button>
         </div>
       </div>
