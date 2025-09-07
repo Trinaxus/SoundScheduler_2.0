@@ -7,7 +7,8 @@ const TimeChecker: React.FC = () => {
     sounds, 
     playSound, 
     isGloballyEnabled,
-    markSchedulePlayed 
+    markSchedulePlayed,
+    mutedSchedules,
   } = useSounds();
   const [currentTime, setCurrentTime] = useState<string>(getCurrentTime());
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -61,7 +62,8 @@ const TimeChecker: React.FC = () => {
         if (
           schedule.active && 
           isTimeToPlay(schedule.time) && 
-          !hasBeenPlayedToday(schedule.lastPlayed)
+          !hasBeenPlayedToday(schedule.lastPlayed) &&
+          !mutedSchedules.has(schedule.id)
         ) {
           const now = Date.now();
           const lastPlayed = lastPlayedTimesRef.current.get(schedule.id) || 0;

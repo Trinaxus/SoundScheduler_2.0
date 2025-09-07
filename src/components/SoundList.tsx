@@ -3,6 +3,7 @@ import { Play, Pause, X, Clock, Edit, Save } from 'lucide-react';
 import { useSounds } from '../context/SoundContext';
 import { formatFileSize, formatDuration, formatTime } from '../utils/helpers';
 import ScheduleEditor from './ScheduleEditor';
+import SoundUploader from './SoundUploader';
 // Cover removed: no API_BASE required
 
 const SoundList: React.FC = () => {
@@ -20,6 +21,7 @@ const SoundList: React.FC = () => {
   const [editName, setEditName] = useState<string>('');
   const [expandedSchedulerId, setExpandedSchedulerId] = useState<string | null>(null);
   const [filterCat, setFilterCat] = useState<string>('');
+  const [uploadOpen, setUploadOpen] = useState<boolean>(false);
 
   const handleStartEditing = (id: string, currentName: string) => {
     setEditingId(id);
@@ -57,7 +59,7 @@ const SoundList: React.FC = () => {
 
   return (
     <div className="space-y-4">
-      {/* Filter pills */}
+      {/* Filter pills + plus button */}
       <div className="flex items-center justify-between">
         <div className="flex flex-wrap gap-2 mb-2">
           <button
@@ -75,6 +77,42 @@ const SoundList: React.FC = () => {
               {c.name}
             </button>
           ))}
+        </div>
+        <button
+          onClick={() => setUploadOpen(v => !v)}
+          className={`p-2 rounded-lg transition-colors ${uploadOpen ? 'bg-[#4ECBD9]/20 text-[#4ECBD9]' : 'bg-[#4ECBD9]/10 text-[#4ECBD9] hover:bg-[#4ECBD9]/20'}`}
+          title={uploadOpen ? 'Upload-Bereich schließen' : 'Upload-Bereich öffnen'}
+          aria-expanded={uploadOpen}
+          aria-controls="soundlist-upload"
+        >
+          {/* Using a simple plus via CSS rotates when open */}
+          <span className={`block w-5 h-5 relative`}> 
+            <span className={`absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 h-0.5 w-4 bg-current transition-transform ${uploadOpen ? 'rotate-45' : ''}`} />
+            <span className={`absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 h-4 w-0.5 bg-current transition-transform ${uploadOpen ? '-rotate-45' : ''}`} />
+          </span>
+        </button>
+      </div>
+
+      {/* Collapsible Upload Panel */}
+      <div id="soundlist-upload" className={`overflow-hidden transition-all duration-300 ${uploadOpen ? 'max-h-[600px] opacity-100 translate-y-0' : 'max-h-0 opacity-0 -translate-y-1'}`}>
+        <div className="bg-neutral-800/80 rounded-xl p-4 sm:p-6 border border-neutral-700/30 backdrop-blur-sm shadow-[0_10px_30px_rgba(0,0,0,0.35)]">
+          <div className="mb-3 flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-semibold text-neutral-100">Audiodateien hochladen</h3>
+              <p className="text-xs text-neutral-400">Drag & Drop • Mehrfach-Upload • Fortschritt</p>
+            </div>
+            <button
+              onClick={() => setUploadOpen(false)}
+              className="p-2 rounded-lg text-neutral-400 hover:text-white hover:bg-neutral-700/50"
+              aria-label="Upload schließen"
+            >
+              <span className="block w-5 h-5 relative">
+                <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 h-0.5 w-4 bg-current rotate-45" />
+                <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 h-4 w-0.5 bg-current -rotate-45" />
+              </span>
+            </button>
+          </div>
+          <SoundUploader />
         </div>
       </div>
 

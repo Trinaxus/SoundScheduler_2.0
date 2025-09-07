@@ -1,6 +1,5 @@
 import React from 'react';
 import SoundUploader from './SoundUploader';
-import { soundsResync } from '../lib/api';
 import SoundList from './SoundList';
 import TimelineView from './TimelineView';
 import TimeChecker from './TimeChecker';
@@ -11,19 +10,7 @@ const SoundManagerPanel: React.FC = () => {
   const [activeTab, setActiveTab] = React.useState<'list' | 'timeline' | 'soundboard'>('list');
   const { isGloballyEnabled, toggleGloballyEnabled } = useSounds();
 
-  const [resyncing, setResyncing] = React.useState(false);
-
-  const handleResync = async () => {
-    try {
-      setResyncing(true);
-      await soundsResync();
-      // Für jetzt einfach neu laden, damit SoundContext das Manifest erneut lädt
-      window.location.reload();
-    } catch (e) {
-      console.error('Resync failed', e);
-      setResyncing(false);
-    }
-  };
+  // Resync entfernt
 
   return (
     <div className="bg-neutral-900 rounded-xl border-[0.5px] border-neutral-700/20">
@@ -68,14 +55,6 @@ const SoundManagerPanel: React.FC = () => {
           </div>
 
           <div className="ml-6 flex items-center space-x-3 flex-shrink-0">
-            <button
-              onClick={handleResync}
-              disabled={resyncing}
-              className="px-3 py-2 rounded-lg border-[0.5px] border-neutral-600/50 bg-neutral-700/50 text-neutral-400 hover:bg-neutral-600 hover:text-white active:bg-neutral-500 transition-all"
-              title="Uploads-Ordner scannen und fehlende Dateien ins Manifest übernehmen"
-            >
-              {resyncing ? 'Resync…' : 'Resync'}
-            </button>
             <label className="relative inline-flex items-center cursor-pointer touch-manipulation group" title={isGloballyEnabled ? 'ON AIR' : ''}>
               <input 
                 type="checkbox" 
@@ -105,14 +84,9 @@ const SoundManagerPanel: React.FC = () => {
       
       <div className="p-4 sm:p-6 space-y-6">
         {activeTab === 'list' && (
-          <>
-            <div className="bg-neutral-800 rounded-xl p-4 sm:p-6 border-[0.5px] border-neutral-700/20">
-              <SoundUploader />
-            </div>
-            <div>
-              <SoundList />
-            </div>
-          </>
+          <div>
+            <SoundList />
+          </div>
         )}
         {activeTab === 'timeline' && (
           <div>

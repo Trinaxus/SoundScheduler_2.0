@@ -21,6 +21,7 @@ interface SoundContextType {
   categories: { id: string; name: string; display_order?: number }[];
   isGloballyEnabled: boolean;
   currentTimeSeconds: number;
+  mutedSchedules: Set<string>;
   addSound: (file: File) => Promise<void>;
   deleteSound: (id: string) => void;
   renameSound: (id: string, newName: string) => void;
@@ -42,6 +43,7 @@ interface SoundContextType {
   renameCategory: (id: string, name: string) => Promise<void>;
   deleteCategory: (id: string) => Promise<void>;
   updateSoundOrder: (sounds: Sound[]) => Promise<void>;
+  toggleScheduleMute: (scheduleId: string) => void;
 }
 
 const SUPPORTED_AUDIO_TYPES = [
@@ -103,6 +105,7 @@ export const SoundProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [categories, setCategories] = useState<{ id: string; name: string; display_order?: number }[]>([]);
   const [isGloballyEnabled, setIsGloballyEnabled] = useState<boolean>(true);
   const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
+  const [mutedSchedules, setMutedSchedules] = useState<Set<string>>(new Set());
   const lastPlayTimestampRef = useRef<number>(0);
   const DEBOUNCE_TIME = 300; // 300ms debounce for play/pause actions
 
@@ -332,6 +335,15 @@ export const SoundProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const stopSound = useCallback((): void => {
     pauseSound();
   }, [pauseSound]);
+
+  // Toggle mute for a specific Schedule ID (affects only auto-play, not manual play)
+  const toggleScheduleMute = useCallback((scheduleId: string) => {
+    setMutedSchedules(prev => {
+      const next = new Set(prev);
+      if (next.has(scheduleId)) next.delete(scheduleId); else next.add(scheduleId);
+      return next;
+    });
+  }, []);
 
   const deleteSound = useCallback(async (id: string): Promise<void> => {
     try {
@@ -580,6 +592,7 @@ export const SoundProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     categories,
     isGloballyEnabled,
     currentTimeSeconds,
+    mutedSchedules,
     addSound,
     deleteSound,
     renameSound,
@@ -600,7 +613,8 @@ export const SoundProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     addCategory,
     renameCategory,
     deleteCategory,
-    updateSoundOrder
+    updateSoundOrder,
+    toggleScheduleMute
   };
 
   return <SoundContext.Provider value={value}>{children}</SoundContext.Provider>;

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Clock, Play, Pause, VolumeX, Volume1, Plus, Star, X, Settings } from 'lucide-react';
 import { useSounds } from '../context/SoundContext';
 import { formatTime, formatDuration } from '../utils/helpers';
@@ -15,10 +15,9 @@ const DEFAULT_SEGMENTS = [
 ];
 
 const TimelineView: React.FC = () => {
-  const { sounds, addSchedule, playSound, pauseSound, currentlyPlaying, toggleFavorite } = useSounds();
+  const { sounds, addSchedule, playSound, pauseSound, currentlyPlaying, toggleFavorite, mutedSchedules, toggleScheduleMute } = useSounds();
   const [selectedTime, setSelectedTime] = useState<string>('');
   const [selectedSound, setSelectedSound] = useState<string | null>(null);
-  const [mutedSchedules, setMutedSchedules] = useState<Set<string>>(new Set());
   const [mutedSegments, setMutedSegments] = useState<Set<string>>(new Set());
   const [showSoundPicker, setShowSoundPicker] = useState(false);
   const [activeSchedule, setActiveSchedule] = useState<string | null>(null);
@@ -35,20 +34,8 @@ const TimelineView: React.FC = () => {
   // (moved below schedulesBySegment)
 
   const toggleMute = (id: string) => {
-    setMutedSchedules(prev => {
-      const copy = new Set(prev);
-      if (copy.has(id)) {
-        copy.delete(id);
-      } else {
-        copy.add(id);
-        // If the currently active schedule is muted, pause immediately
-        if (activeSchedule === id) {
-          pauseSound();
-          setActiveSchedule(null);
-        }
-      }
-      return copy;
-    });
+    // Delegate to global context (affects only auto-play). If currently this schedule is playing, do not force-stop.
+    toggleScheduleMute(id);
   };
 
   const schedulesBySegment = useMemo(() => {
@@ -75,31 +62,10 @@ const TimelineView: React.FC = () => {
     return grouped;
   }, [sounds, currentTime, segments]);
 
-  // Enforce mute globally: if a sound is playing that belongs to a muted schedule or muted segment, pause it immediately
-  useEffect(() => {
-    if (!currentlyPlaying) return;
-    let mustPause = false;
-    Object.entries(schedulesBySegment).forEach(([segId, items]) => {
-      if (mustPause) return;
-      const segMuted = mutedSegments.has(segId);
-      (items as any[]).forEach((it) => {
-        if (mustPause) return;
-        if (it.soundId === currentlyPlaying) {
-          if (segMuted || mutedSchedules.has(it.id)) {
-            mustPause = true;
-          }
-        }
-      });
-    });
-    if (mustPause) {
-      pauseSound();
-      setActiveSchedule(null);
-    }
-  }, [currentlyPlaying, mutedSchedules, mutedSegments, schedulesBySegment, pauseSound]);
+  // Hinweis: Mute wirkt nur auf die zeitgesteuerte Wiedergabe, nicht auf das manuelle Probehören per Play-Taste
 
   const handlePlaySound = (soundId: string, scheduleId: string, segmentId: string) => {
-    // Block playback if this entry or its segment is muted
-    if (mutedSchedules.has(scheduleId) || mutedSegments.has(segmentId)) return;
+    // Manuelles Abspielen immer zulassen. Mute betrifft nur die automatische/zeitgesteuerte Wiedergabe.
     if (currentlyPlaying === soundId && activeSchedule === scheduleId) {
       pauseSound();
       setActiveSchedule(null);
@@ -201,7 +167,7 @@ const TimelineView: React.FC = () => {
                   }}
                   className={`p-2 rounded-full ${
                     mutedSegments.has(segment.id)
-                      ? 'bg-[#4ECBD9]/10 text-[#4ECBD9]'
+                      ? 'bg-[#F87171]/10 text-[#F87171]'
                       : 'bg-neutral-700 text-[#C1C2C5] hover:bg-neutral-600'
                   }`}
                   title={mutedSegments.has(segment.id) ? 'Segment stumm' : 'Segment entstummen'}
@@ -227,18 +193,15 @@ const TimelineView: React.FC = () => {
                         <div className="flex items-center gap-3 min-w-0">
                           <button
                             onClick={() => handlePlaySound(schedule.soundId, schedule.id, segment.id)}
-                            disabled={mutedSchedules.has(schedule.id) || mutedSegments.has(segment.id)}
                             title={
-                              mutedSegments.has(segment.id)
-                                ? 'Segment stumm – Wiedergabe blockiert'
-                                : (mutedSchedules.has(schedule.id) ? 'Eintrag stumm – Wiedergabe blockiert' : 'Abspielen/Pausieren')
+                              (mutedSegments.has(segment.id) || mutedSchedules.has(schedule.id))
+                                ? 'Stummgeschaltet – wirkt nur auf die zeitgesteuerte Wiedergabe'
+                                : 'Abspielen/Pausieren'
                             }
                             className={`p-2 rounded-full ${
-                              (mutedSchedules.has(schedule.id) || mutedSegments.has(segment.id))
-                                ? 'bg-neutral-700 text-neutral-500 cursor-not-allowed'
-                                : (currentlyPlaying === schedule.soundId && activeSchedule === schedule.id
-                                    ? 'bg-[#4ECBD9]/20 text-[#4ECBD9]'
-                                    : 'bg-[#4ECBD9]/10 text-[#4ECBD9] hover:bg-[#4ECBD9]/20')
+                              (currentlyPlaying === schedule.soundId && activeSchedule === schedule.id)
+                                ? 'bg-[#4ECBD9]/20 text-[#4ECBD9]'
+                                : 'bg-[#4ECBD9]/10 text-[#4ECBD9] hover:bg-[#4ECBD9]/20'
                             }`}
                           >
                             {currentlyPlaying === schedule.soundId && activeSchedule === schedule.id ? (
@@ -269,7 +232,7 @@ const TimelineView: React.FC = () => {
                             onClick={() => toggleMute(schedule.id)}
                             className={`p-1.5 rounded-full transition-colors ${
                               mutedSchedules.has(schedule.id)
-                                ? 'bg-[#4ECBD9]/10 text-[#4ECBD9]'
+                                ? 'bg-[#F87171]/10 text-[#F87171]'
                                 : 'bg-neutral-700 text-[#909296] hover:text-[#C1C2C5]'
                             }`}
                           >
