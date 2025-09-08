@@ -16,12 +16,15 @@ import {
   categoriesDelete,
   timelineGet,
   timelineSave,
+  remoteGet,
+  remoteSend,
 } from '../lib/api';
 
 interface SoundContextType {
   sounds: Sound[];
   categories: { id: string; name: string; display_order?: number }[];
   isGloballyEnabled: boolean;
+  isHost: boolean; // this device is the Player/Host
   currentTimeSeconds: number;
   mutedSchedules: Set<string>;
   mutedSegments: Set<string>;
@@ -49,6 +52,8 @@ interface SoundContextType {
   updateSoundOrder: (sounds: Sound[]) => Promise<void>;
   toggleScheduleMute: (scheduleId: string) => void;
   toggleSegmentMute: (segmentId: string) => void;
+  setHostMode: (host: boolean) => void;
+  playOrRemote: (soundId: string) => Promise<void>;
 }
 
 const SUPPORTED_AUDIO_TYPES = [
@@ -109,12 +114,18 @@ export const SoundProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [currentTimeSeconds, setCurrentTimeSeconds] = useState<number>(0);
   const [categories, setCategories] = useState<{ id: string; name: string; display_order?: number }[]>([]);
   const [isGloballyEnabled, setIsGloballyEnabled] = useState<boolean>(true);
+  const [isHost, setIsHost] = useState<boolean>(() => {
+    try {
+      return window.localStorage.getItem('player_is_host') === '1';
+    } catch { return false; }
+  });
   const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
   const [mutedSchedules, setMutedSchedules] = useState<Set<string>>(new Set());
   const [mutedSegments, setMutedSegments] = useState<Set<string>>(new Set());
   const [timelineLoaded, setTimelineLoaded] = useState<boolean>(false);
   const lastPlayTimestampRef = useRef<number>(0);
   const DEBOUNCE_TIME = 300; // 300ms debounce for play/pause actions
+  const lastRemoteTsRef = useRef<number>(0);
 
   useEffect(() => {
     const load = async () => {
@@ -171,6 +182,8 @@ export const SoundProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
     };
   }, []);
+
+  // (moved below playSound/pauseSound declarations)
 
   useEffect(() => {
     (async () => {
@@ -358,6 +371,47 @@ export const SoundProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const stopSound = useCallback((): void => {
     pauseSound();
   }, [pauseSound]);
+
+  // Poll remote commands when this device is Host (placed after playSound/pauseSound)
+  useEffect(() => {
+    if (!isHost) return;
+    let cancelled = false;
+    const interval = setInterval(async () => {
+      try {
+        const res = await remoteGet();
+        if (!res || !res.command) return;
+        const { action, soundId, ts } = res.command as any;
+        if (!ts || ts <= lastRemoteTsRef.current) return;
+        lastRemoteTsRef.current = ts;
+        if (cancelled) return;
+        if (action === 'play' && soundId) {
+          playSound(soundId);
+        } else if (action === 'pause') {
+          pauseSound();
+        }
+      } catch (_) {
+        // ignore network errors
+      }
+    }, 600);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, [isHost, playSound, pauseSound]);
+
+  const setHostMode = useCallback((host: boolean) => {
+    setIsHost(host);
+    try { window.localStorage.setItem('player_is_host', host ? '1' : '0'); } catch {}
+  }, []);
+
+  const playOrRemote = useCallback(async (soundId: string) => {
+    if (isHost) {
+      playSound(soundId);
+      return;
+    }
+    try {
+      await remoteSend('play', soundId);
+    } catch (e) {
+      console.warn('Failed to send remote play', e);
+    }
+  }, [isHost, playSound]);
 
   // Toggle mute for a specific Schedule ID (affects only auto-play, not manual play)
   const toggleScheduleMute = useCallback((scheduleId: string) => {
@@ -630,6 +684,7 @@ export const SoundProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     sounds,
     categories,
     isGloballyEnabled,
+    isHost,
     currentTimeSeconds,
     mutedSchedules,
     mutedSegments,
@@ -656,7 +711,9 @@ export const SoundProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     deleteCategory,
     updateSoundOrder,
     toggleScheduleMute,
-    toggleSegmentMute
+    toggleSegmentMute,
+    setHostMode,
+    playOrRemote,
   };
 
   return <SoundContext.Provider value={value}>{children}</SoundContext.Provider>;

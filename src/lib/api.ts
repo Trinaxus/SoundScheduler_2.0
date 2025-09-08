@@ -229,3 +229,14 @@ export async function timelineSave(mutedSchedules: string[], mutedSegments: stri
   form.append('mutedSegments', JSON.stringify(mutedSegments));
   return apiPost<{ ok: true; mutedSchedules: string[]; mutedSegments: string[] }>(`/timeline.php?action=save`, form);
 }
+
+// --- Remote control (no supabase) ---
+export type RemoteCommand = { action: string; soundId?: string | null; ts: number } | null;
+
+export async function remoteGet() {
+  return apiGet<{ ok: boolean; command: RemoteCommand }>(`/remote.php?action=get`);
+}
+
+export async function remoteSend(action: 'play' | 'pause', soundId?: string) {
+  return apiPost<{ ok: boolean; command: RemoteCommand }>(`/remote.php?action=send`, { action, soundId });
+}

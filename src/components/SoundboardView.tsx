@@ -21,6 +21,7 @@ const SoundboardView: React.FC = () => {
     updateSoundOrder,
     currentTimeSeconds,
   } = useSounds();
+  const { playOrRemote } = useSounds() as any;
   
   const [sounds, setSounds] = useState<Sound[]>([]);
   const [filterCat, setFilterCat] = useState<string>('');
@@ -238,14 +239,7 @@ const SoundboardView: React.FC = () => {
                               categories={categories}
                               colorFor={colorFor}
                               currentTimeSeconds={currentTimeSeconds}
-                              onPlay={() => {
-                                if (currentlyPlaying === sound.id) {
-                                  pauseSound();
-                                } else {
-                                  if (currentlyPlaying && currentlyPlaying !== sound.id) pauseSound();
-                                  playSound(sound.id);
-                                }
-                              }}
+                              onPlay={() => playOrRemote(sound.id)}
                               onToggleFavorite={() => toggleFavorite(sound.id)}
                               onToggleHidden={() => toggleHiddenCategory(sound.id)}
                             />
@@ -301,14 +295,7 @@ const SoundboardView: React.FC = () => {
                       categories={categories}
                       colorFor={colorFor}
                       currentTimeSeconds={currentTimeSeconds}
-                      onPlay={() => {
-                        if (currentlyPlaying === sound.id) {
-                          pauseSound();
-                        } else {
-                          if (currentlyPlaying && currentlyPlaying !== sound.id) pauseSound();
-                          playSound(sound.id);
-                        }
-                      }}
+                      onPlay={() => playOrRemote(sound.id)}
                       onToggleFavorite={() => toggleFavorite(sound.id)}
                       onToggleHidden={() => toggleHiddenCategory(sound.id)}
                     />
