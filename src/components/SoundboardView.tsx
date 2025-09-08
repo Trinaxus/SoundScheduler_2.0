@@ -195,15 +195,16 @@ const SoundboardView: React.FC<{ mode?: SoundboardMode }> = ({ mode = 'normal' }
                 className="w-full pl-9 pr-3 py-2 rounded-lg bg-neutral-700/50 border border-neutral-600 text-sm text-[#C1C2C5] placeholder:text-neutral-500 focus:outline-none focus:ring-1 focus:ring-[#4ECBD9]/40"
               />
             </div>
-            {!isRemoteFavorites && (
-              <div className="flex flex-wrap gap-2">
-                <button
-                  onClick={() => setFilterCat('')}
-                  className={`appearance-none p-0 inline-flex items-center justify-center min-h-[24px] h-[24px] px-4 rounded-full text-[12px] sm:text-sm border leading-none ${filterCat === '' ? 'bg-[#0d1718] text-[#4ECBD9] border-transparent ring-1 ring-[#4ECBD9]/40' : 'bg-neutral-800 text-[#C1C2C5] border-neutral-700 hover:bg-neutral-700'}`}
-                >
-                  Alle
-                </button>
-                {categories.map((c) => (
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => setFilterCat('')}
+                className={`appearance-none p-0 inline-flex items-center justify-center min-h-[24px] h-[24px] px-4 rounded-full text-[12px] sm:text-sm border leading-none ${filterCat === '' ? 'bg-[#0d1718] text-[#4ECBD9] border-transparent ring-1 ring-[#4ECBD9]/40' : 'bg-neutral-800 text-[#C1C2C5] border-neutral-700 hover:bg-neutral-700'}`}
+              >
+                Alle
+              </button>
+              {categories
+                .filter(c => (c.name || '').toLowerCase() !== 'ausgeblendet')
+                .map((c) => (
                   <button
                     key={c.id}
                     onClick={() => setFilterCat(c.id)}
@@ -215,8 +216,7 @@ const SoundboardView: React.FC<{ mode?: SoundboardMode }> = ({ mode = 'normal' }
                     </span>
                   </button>
                 ))}
-              </div>
-            )}
+            </div>
           </div>
           {!isRemoteFavorites && (
             <button
@@ -240,8 +240,8 @@ const SoundboardView: React.FC<{ mode?: SoundboardMode }> = ({ mode = 'normal' }
         {(() => {
           const hiddenCat = categories.find(c => (c.name || '').toLowerCase() === 'ausgeblendet');
           const hiddenCatId = hiddenCat?.id;
-          const favCat = categories.find(c => (c.name || '').toLowerCase() === 'favoriten');
-          const fixedCatId = isRemoteFavorites ? favCat?.id : undefined;
+          // Remote mode should display all categories except 'Ausgeblendet'
+          const fixedCatId = undefined;
 
           // Alle-Ansicht: gruppiert nach Kategorien
           if (!filterCat || fixedCatId) {
