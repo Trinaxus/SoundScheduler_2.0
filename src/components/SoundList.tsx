@@ -25,7 +25,7 @@ const SoundList: React.FC = () => {
   const [filterCat, setFilterCat] = useState<string>('');
   const [uploadOpen, setUploadOpen] = useState<boolean>(false);
   const [search, setSearch] = useState<string>('');
-  const [activePresetName, setActivePresetName] = useState<string | null>(null);
+  // removed unused activePresetName
   const [timelineSegments, setTimelineSegments] = useState<Array<{ id: string; title: string; startTime: string; endTime: string }>>([]);
   const [soundsBySegment, setSoundsBySegment] = useState<Record<string, Array<string | { id: string; time?: string }>>>({});
   const [menuOpen, setMenuOpen] = useState<boolean>(false);
@@ -34,7 +34,6 @@ const SoundList: React.FC = () => {
     (async () => {
       try {
         const data = await timelineGet();
-        setActivePresetName((data as any).activePresetName || null);
         if ((data as any).segments) setTimelineSegments(((data as any).segments || []) as Array<{ id: string; title: string; startTime: string; endTime: string }>);
         if ((data as any).soundsBySegment) setSoundsBySegment((data as any).soundsBySegment as Record<string, Array<string | { id: string; time?: string }>>);
       } catch {}
@@ -42,7 +41,6 @@ const SoundList: React.FC = () => {
     const onTlUpdate = async () => {
       try {
         const data = await timelineGet();
-        setActivePresetName((data as any).activePresetName || null);
         if ((data as any).segments) setTimelineSegments(((data as any).segments || []) as Array<{ id: string; title: string; startTime: string; endTime: string }>);
         if ((data as any).soundsBySegment) setSoundsBySegment((data as any).soundsBySegment as Record<string, Array<string | { id: string; time?: string }>>);
       } catch {}

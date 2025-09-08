@@ -154,6 +154,36 @@ export const SoundProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       setSounds(mapped);
       setManifestVersion(manifest.version);
       setCategories((manifest.categories || []).map((c:any)=>({ id:c.id, name:c.name, display_order:c.display_order })));
+
+      // Post-load: compute and persist missing durations (e.g., after resync)
+      const missing = mapped.filter(s => (s.duration ?? 0) <= 0 && s.url);
+      for (const s of missing) {
+        try {
+          const dur = await new Promise<number>((resolve) => {
+            const audio = new Audio();
+            audio.preload = 'metadata';
+            audio.onloadedmetadata = () => {
+              const d = isFinite(audio.duration) ? audio.duration : 0;
+              resolve(d || 0);
+            };
+            audio.onerror = () => resolve(0);
+            try {
+              const u = new URL(s.url);
+              audio.src = u.toString();
+            } catch {
+              audio.src = s.url as any;
+            }
+          });
+          if (dur > 0) {
+            // Persist duration into manifest and update local state
+            const res = await soundsUpdate({ id: s.id, duration: dur }, manifest.version);
+            setManifestVersion(res.version);
+            setSounds(prev => prev.map(x => x.id === s.id ? { ...x, duration: dur } : x));
+          }
+        } catch (_) {
+          // ignore per-item failures
+        }
+      }
     } catch (e) {
       console.error('Error loading manifest:', e);
     }

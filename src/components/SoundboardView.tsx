@@ -219,7 +219,27 @@ const SoundboardView: React.FC<{ mode?: SoundboardMode }> = ({ mode = 'normal' }
                           <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ backgroundColor: colorFor(fixedCatId || 'fav') }} />
                           <h4 className="text-xs uppercase tracking-wide text-[#909296]">Favoriten</h4>
                         </div>
-                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                        {/* Mobile: compact rows */}
+                        <div className="sm:hidden">
+                          <ul className="divide-y divide-neutral-800 rounded-lg border border-neutral-800 overflow-hidden">
+                            {favItems.map(sound => (
+                              <li key={sound.id} className="bg-neutral-800/40">
+                                <button
+                                  className={`w-full flex items-center gap-3 px-3 py-2 text-left hover:bg-neutral-800/70 ${currentlyPlaying===sound.id?'ring-1 ring-[#4ECBD9]':''}`}
+                                  onClick={() => playOrRemote(sound.id)}
+                                >
+                                  <span className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${currentlyPlaying===sound.id?'bg-[#4ECBD9]/20 text-[#4ECBD9]':'bg-[#4ECBD9]/10 text-[#4ECBD9]'}`}>
+                                    {currentlyPlaying===sound.id? <Pause className="w-4 h-4"/> : <Play className="w-4 h-4"/>}
+                                  </span>
+                                  <span className="flex-1 truncate text-[#C1C2C5]">{sound.name}</span>
+                                  <span className="text-[10px] text-[#909296]">{formatDuration(sound.duration)}</span>
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                        {/* Desktop/tablet: card grid */}
+                        <div className="hidden sm:grid grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
                           {favItems.map(sound => (
                             <SortableCard
                               key={sound.id}
@@ -286,7 +306,27 @@ const SoundboardView: React.FC<{ mode?: SoundboardMode }> = ({ mode = 'normal' }
                           {sec.color && <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ backgroundColor: sec.color }} />}
                           <h4 className="text-xs uppercase tracking-wide text-[#909296]">{sec.title}</h4>
                         </div>
-                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                        {/* Mobile: compact rows */}
+                        <div className="sm:hidden">
+                          <ul className="divide-y divide-neutral-800 rounded-lg border border-neutral-800 overflow-hidden">
+                            {sec.items.map(sound => (
+                              <li key={sound.id} className="bg-neutral-800/40">
+                                <button
+                                  className={`w-full flex items-center gap-3 px-3 py-2 text-left hover:bg-neutral-800/70 ${currentlyPlaying===sound.id?'ring-1 ring-[#4ECBD9]':''}`}
+                                  onClick={() => playOrRemote(sound.id)}
+                                >
+                                  <span className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${currentlyPlaying===sound.id?'bg-[#4ECBD9]/20 text-[#4ECBD9]':'bg-[#4ECBD9]/10 text-[#4ECBD9]'}`}>
+                                    {currentlyPlaying===sound.id? <Pause className="w-4 h-4"/> : <Play className="w-4 h-4"/>}
+                                  </span>
+                                  <span className="flex-1 truncate text-[#C1C2C5]">{sound.name}</span>
+                                  <span className="text-[10px] text-[#909296]">{formatDuration(sound.duration)}</span>
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                        {/* Desktop/tablet: card grid */}
+                        <div className="hidden sm:grid grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
                           {sec.items.map(sound => (
                             <SortableCard
                               key={sound.id}
@@ -342,7 +382,27 @@ const SoundboardView: React.FC<{ mode?: SoundboardMode }> = ({ mode = 'normal' }
           return (
             <>
               <SortableContext items={list.map(s => s.id)} strategy={rectSortingStrategy}>
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                {/* Mobile: compact rows */}
+                <div className="sm:hidden">
+                  <ul className="divide-y divide-neutral-800 rounded-lg border border-neutral-800 overflow-hidden">
+                    {list.map(sound => (
+                      <li key={sound.id} className="bg-neutral-800/40">
+                        <button
+                          className={`w-full flex items-center gap-3 px-3 py-2 text-left hover:bg-neutral-800/70 ${currentlyPlaying===sound.id?'ring-1 ring-[#4ECBD9]':''}`}
+                          onClick={() => playOrRemote(sound.id)}
+                        >
+                          <span className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${currentlyPlaying===sound.id?'bg-[#4ECBD9]/20 text-[#4ECBD9]':'bg-[#4ECBD9]/10 text-[#4ECBD9]'}`}>
+                            {currentlyPlaying===sound.id? <Pause className="w-4 h-4"/> : <Play className="w-4 h-4"/>}
+                          </span>
+                          <span className="flex-1 truncate text-[#C1C2C5]">{sound.name}</span>
+                          <span className="text-[10px] text-[#909296]">{formatDuration(sound.duration)}</span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                {/* Desktop/tablet: card grid */}
+                <div className="hidden sm:grid grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
                   {list.map((sound) => (
                     <SortableCard
                       key={sound.id}

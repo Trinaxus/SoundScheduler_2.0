@@ -3,6 +3,7 @@ import { Clock, Play, Pause, VolumeX, Volume1, Plus, Star, X, Settings } from 'l
 import { useSounds } from '../context/SoundContext';
 import { formatTime, formatDuration } from '../utils/helpers';
 import PresetManagerModal, { TimelineSegment as PresetSegment } from './PresetManagerModal';
+import { presetsUpsert } from '../lib/api';
 import { timelineGet, timelineSave } from '../lib/api';
 
 const DEFAULT_SEGMENTS = [
@@ -30,7 +31,13 @@ const TimelineView: React.FC = () => {
   const now = new Date();
   const currentTime = now.toTimeString().split(' ')[0];
 
-  const isTimeInSegment = (time: string, start: string, end: string) => time >= start && time <= end;
+  // Treat segment end as exclusive to avoid double-counting times on boundaries.
+  // Allow inclusive end only for the last segment that ends at 23:59:59
+  const isTimeInSegment = (time: string, start: string, end: string) => {
+    const endInclusive = end === '23:59:59';
+    if (endInclusive) return time >= start && time <= end;
+    return time >= start && time < end;
+  };
   const isPastSegment = (end: string) => currentTime > end;
 
   // (moved below schedulesBySegment)
@@ -142,6 +149,39 @@ const TimelineView: React.FC = () => {
     setError(null);
   };
 
+  const exportPresets = async () => {
+    try {
+      // Build segments payload
+      const segs = segments.map(s => ({ id: s.id, title: s.title, startTime: s.startTime, endTime: s.endTime }));
+
+      // Build mapping of sounds by segment from current schedules
+      const map: Record<string, Array<{ id: string; time?: string }>> = {};
+      for (const seg of segments) {
+        const arr: Array<{ id: string; time?: string }> = [];
+        for (const sound of sounds) {
+          for (const sch of (sound.schedules || [])) {
+            if (isTimeInSegment(sch.time, seg.startTime, seg.endTime)) {
+              arr.push({ id: sound.id, time: sch.time });
+            }
+          }
+        }
+        // sort by time ascending
+        arr.sort((a,b) => (a.time || '').localeCompare(b.time || ''));
+        map[seg.id] = arr;
+      }
+
+      const defaultName = `Export ${new Date().toLocaleString()}`;
+      const name = (typeof window !== 'undefined' ? window.prompt('Name für Preset-Export eingeben:', defaultName) : defaultName) || defaultName;
+      const id = Math.random().toString(36).slice(2,10);
+
+      await presetsUpsert({ id, name, segments: segs, soundsBySegment: map });
+      try { alert('Preset exportiert: ' + name); } catch {}
+    } catch (e) {
+      console.error('Export failed', e);
+      try { alert('Export fehlgeschlagen'); } catch {}
+    }
+  };
+
   return (
     <div className="space-y-4">
       {/* Top row: Active preset (left) + actions (right) */}
@@ -161,6 +201,13 @@ const TimelineView: React.FC = () => {
             title="Timeline-Presets verwalten"
           >
             <Settings className="w-4 h-4" />
+          </button>
+          <button
+            onClick={exportPresets}
+            className="hidden sm:inline-flex items-center gap-2 px-3 h-9 rounded-lg bg-neutral-700 text-neutral-200 hover:bg-neutral-600 border border-neutral-600"
+            title="Aktuelle Segmente und zugewiesene Zeiten als Preset speichern"
+          >
+            Presets exportieren
           </button>
           <button
             onClick={handleGlobalAdd}

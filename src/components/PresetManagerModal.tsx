@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { X, Plus, Save, Trash2, Edit2, Check, Copy, Trash } from 'lucide-react';
+import { X, Plus, Save, Trash2, Edit2, Check, Copy, Trash, ChevronDown } from 'lucide-react';
 import { presetsList, presetsUpsert, presetsDelete } from '../lib/api';
 import { timelineGet, timelineSave } from '../lib/api';
 import { useSounds } from '../context/SoundContext';
@@ -32,6 +32,16 @@ const PresetManagerModal: React.FC<Props> = ({ open, onClose, currentSegments, o
   const [editingName, setEditingName] = useState<string>('');
   const { sounds } = useSounds();
   const [activePresetId, setActivePresetId] = useState<string | null>(null);
+  const [presetSearch, setPresetSearch] = useState<string>('');
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+
+  const toggleCollapsed = (id: string) => {
+    setCollapsed(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -209,7 +219,7 @@ const PresetManagerModal: React.FC<Props> = ({ open, onClose, currentSegments, o
 
   return (
     <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
-      <div className="w-full max-w-5xl max-h-[85vh] bg-neutral-800 rounded-xl border border-neutral-700 overflow-hidden flex flex-col">
+      <div className="w-full max-w-7xl max-h-[88vh] bg-neutral-800 rounded-xl border border-neutral-700 overflow-hidden flex flex-col">
         <div className="flex items-center justify-between p-4 border-b border-neutral-700 shrink-0">
           <h3 className="text-[#C1C2C5] text-lg font-medium">Timeline-Presets</h3>
           <button onClick={onClose} className="p-2 text-neutral-400 hover:text-white" aria-label="Schließen">
@@ -217,34 +227,46 @@ const PresetManagerModal: React.FC<Props> = ({ open, onClose, currentSegments, o
           </button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-0 flex-1 overflow-y-auto">
-          {/* Left: List and create */}
-          <div className="p-4 border-b md:border-b-0 md:border-r border-neutral-700 md:col-span-4">
-            <h4 className="text-sm font-medium text-[#C1C2C5] mb-3">Vorlagen</h4>
-
-            <div className="flex items-center gap-2 mb-3">
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-0 flex-1 overflow-y-auto">
+        {/* Left: List and create */}
+        <div className="p-4 border-b md:border-b-0 md:border-r border-neutral-700 md:col-span-3 relative z-20">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-neutral-200">Vorlagen</h3>
+            <div className="flex items-center gap-2">
               <input
-                placeholder="Neuer Preset-Name"
                 value={newName}
-                onChange={e => setNewName(e.target.value)}
-                className="flex-1 bg-neutral-700/50 border border-neutral-600 rounded-lg px-3 py-2 text-sm text-[#C1C2C5]"
+                onChange={(e) => setNewName(e.target.value)}
+                placeholder="Neuer Preset-Name"
+                className="px-2 py-1 rounded bg-neutral-800 border border-neutral-700 text-sm text-[#C1C2C5]"
               />
               <button
                 onClick={saveCurrentAsPreset}
-                className="px-3 py-2 rounded-lg bg-[#4ECBD9]/10 text-[#4ECBD9] border border-[#4ECBD9]/30 hover:bg-[#4ECBD9]/20 text-sm"
-                title="Aktuelles Zeitmodell als Preset speichern"
+                className="w-8 h-8 inline-flex items-center justify-center rounded bg-[#4ECBD9]/10 text-[#4ECBD9] hover:bg-[#4ECBD9]/20"
+                title="Preset anlegen"
               >
                 <Plus className="w-4 h-4" />
               </button>
             </div>
-
-            <ul className="space-y-2">
-              {presets.map(p => (
-                <li
-                  key={p.id}
-                  onClick={() => setSelectedId(p.id)}
-                  className={`flex items-center justify-between px-3 py-2 rounded-lg cursor-pointer ${selectedId === p.id ? 'bg-neutral-700/60 ring-1 ring-neutral-600' : 'bg-neutral-700/30 hover:bg-neutral-700/40'}`}
-                >
+          </div>
+          <div className="mt-2">
+            <div className="relative">
+              <input
+                value={presetSearch}
+                onChange={(e) => setPresetSearch(e.target.value)}
+                placeholder="Presets suchen..."
+                className="w-full px-3 py-1.5 rounded bg-neutral-800 border border-neutral-700 text-sm text-[#C1C2C5]"
+              />
+            </div>
+          </div>
+          <ul className="space-y-2">
+            {presets.filter(p => {
+              const t = presetSearch.trim().toLowerCase();
+              if (!t) return true;
+              return (p.name || '').toLowerCase().includes(t);
+            }).map((p) => (
+              <div key={p.id} className={`flex items-center justify-between px-2 py-2 rounded cursor-pointer ${selectedId === p.id ? 'bg-neutral-700/50' : 'hover:bg-neutral-800/60'}`} onClick={() => setSelectedId(p.id)}>
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="truncate text-sm text-[#C1C2C5]">{p.name}</span>
                   {editingId === p.id ? (
                     <div className="flex items-center gap-2 flex-1">
                       <input
@@ -260,7 +282,6 @@ const PresetManagerModal: React.FC<Props> = ({ open, onClose, currentSegments, o
                     </div>
                   ) : (
                     <>
-                      <span className="text-sm text-[#C1C2C5] truncate text-left">{p.name}</span>
                       <div className="flex items-center gap-1.5">
                         <button onClick={(e) => { e.stopPropagation(); duplicatePreset(p); }} className="p-1 rounded hover:bg-neutral-700" title="Duplizieren"><Copy className="w-4 h-4 text-neutral-400"/></button>
                         <button onClick={(e) => { e.stopPropagation(); startRename(p); }} className="p-1 rounded hover:bg-neutral-700" title="Umbenennen"><Edit2 className="w-4 h-4 text-neutral-400"/></button>
@@ -268,94 +289,111 @@ const PresetManagerModal: React.FC<Props> = ({ open, onClose, currentSegments, o
                       </div>
                     </>
                   )}
-                </li>
-              ))}
-              {presets.length === 0 && (
-                <li className="text-xs text-[#909296]">Noch keine Presets. Aktuelles Zeitmodell benennen und mit + speichern.</li>
-              )}
-            </ul>
-          </div>
-
-          {/* Right: Edit selected (wider) */}
-          <div className="p-4 md:col-span-8">
-            <div className="flex items-center justify-between mb-3">
-              <h4 className="text-sm font-medium text-[#C1C2C5]">Preset bearbeiten</h4>
-              {selectedPreset && (
-                <div className="flex items-center gap-2">
-                  <button onClick={saveEditedSegments} className="px-3 py-1.5 rounded bg-[#4ECBD9]/10 text-[#4ECBD9] hover:bg-[#4ECBD9]/20 text-xs" title="Änderungen speichern">
-                    <Save className="w-4 h-4 inline mr-1"/> Speichern
-                  </button>
-                  <button onClick={() => applyPreset(selectedPreset)} className="px-3 py-1.5 rounded bg-neutral-700 text-neutral-200 hover:bg-neutral-600 text-xs" title="Preset anwenden">
-                    Anwenden
-                  </button>
-                  <button
-                    onClick={async () => {
-                      const map = buildMappingFromSchedules();
-                      setWorkSoundsBySegment(map);
-                      await persistMapping(map);
-                    }}
-                    className="px-3 py-1.5 rounded bg-neutral-700 text-neutral-200 hover:bg-neutral-600 text-xs"
-                    title="Zuordnungen aus aktuellen Zeitplänen erzeugen"
-                  >
-                    Aus Zeitplänen übernehmen
-                  </button>
                 </div>
-              )}
-            </div>
-            {selectedPreset ? (
-              <div className="space-y-4">
-                {workSegments.map((seg, idx) => (
-                  <div key={seg.id} className="space-y-2 bg-neutral-700/20 rounded-lg p-3">
-                    <div className="grid grid-cols-1 sm:grid-cols-7 gap-2 items-center">
+              </div>
+            ))}
+            {presets.length === 0 && (
+              <li className="text-xs text-[#909296]">Noch keine Presets. Aktuelles Zeitmodell benennen und mit + speichern.</li>
+            )}
+          </ul>
+        </div>
+
+        {/* Right: Edit selected (wider) */}
+        <div className="p-4 md:col-span-9">
+          <div className="flex items-center justify-between sticky top-0 z-0 bg-neutral-900/85 backdrop-blur border-b border-neutral-800 px-2 md:px-0 py-2">
+            <h3 className="text-sm font-semibold text-neutral-200">Preset bearbeiten</h3>
+            {selectedPreset && (
+              <div className="flex items-center gap-2">
+                <button onClick={saveEditedSegments} className="px-3 py-1.5 rounded bg-[#4ECBD9]/10 text-[#4ECBD9] hover:bg-[#4ECBD9]/20 text-xs" title="Änderungen speichern">
+                  <Save className="w-4 h-4 inline mr-1"/> Speichern
+                </button>
+                <button onClick={() => applyPreset(selectedPreset)} className="px-3 py-1.5 rounded bg-neutral-700 text-neutral-200 hover:bg-neutral-600 text-xs" title="Preset anwenden">
+                  Anwenden
+                </button>
+                <button
+                  onClick={async () => {
+                    const map = buildMappingFromSchedules();
+                    setWorkSoundsBySegment(map);
+                    await persistMapping(map);
+                  }}
+                  className="px-3 py-1.5 rounded bg-neutral-700 text-neutral-200 hover:bg-neutral-600 text-xs"
+                  title="Zuordnungen aus aktuellen Zeitplänen erzeugen"
+                >
+                  Aus Zeitplänen übernehmen
+                </button>
+              </div>
+            )}
+          </div>
+          {selectedPreset ? (
+            <div className="space-y-4">
+              {workSegments.map((seg, idx) => {
+                const assignments = workSoundsBySegment[seg.id] || [];
+                const isCollapsed = collapsed.has(seg.id);
+                return (
+                  <div key={seg.id} className="bg-neutral-800/40 rounded-lg border border-neutral-700 p-2">
+                    {/* Row: collapse, title, start, end, duration, actions */}
+                    <div className="grid grid-cols-12 gap-3 items-center">
+                      <button onClick={() => toggleCollapsed(seg.id)} className={`col-span-1 inline-flex items-center justify-center rounded hover:bg-neutral-700/50 transition ${isCollapsed?'rotate-[-90deg]':''}`} title={isCollapsed ? 'Aufklappen' : 'Zuklappen'}>
+                        <ChevronDown className="w-4 h-4 text-neutral-400" />
+                      </button>
                       <input
                         value={seg.title}
                         onChange={e => updateSeg(idx, { title: e.target.value })}
-                        className="bg-neutral-800 border border-neutral-700 rounded px-2 py-1 text-sm text-[#C1C2C5] sm:col-span-3"
-                        placeholder="Titel"
+                        className="col-span-3 bg-neutral-800 border border-neutral-700 rounded px-2 py-1 text-sm text-[#C1C2C5]"
+                        placeholder="Segmenttitel"
                       />
                       <input
                         type="time"
                         value={seg.startTime.slice(0,5)}
                         onChange={e => updateSeg(idx, { startTime: e.target.value + ':00' })}
-                        className="bg-neutral-800 border border-neutral-700 rounded px-2 py-1 text-sm text-[#C1C2C5]"
+                        step={60}
+                        className="col-span-2 bg-neutral-800 border border-neutral-700 rounded px-2 py-1 text-sm text-[#C1C2C5] w-[104px] justify-self-start text-center font-mono tabular-nums"
                       />
                       <input
                         type="time"
                         value={seg.endTime.slice(0,5)}
                         onChange={e => updateSeg(idx, { endTime: e.target.value + ':00' })}
-                        className="bg-neutral-800 border border-neutral-700 rounded px-2 py-1 text-sm text-[#C1C2C5]"
+                        step={60}
+                        className="col-span-2 bg-neutral-800 border border-neutral-700 rounded px-2 py-1 text-sm text-[#C1C2C5] w-[104px] justify-self-start text-center font-mono tabular-nums"
                       />
-                      <div className="inline-flex items-center text-xs text-[#4ECBD9] bg-[#4ECBD9]/10 border border-[#4ECBD9]/30 rounded-full px-2 py-0.5 shadow-[0_0_8px_rgba(78,203,217,0.15)]">
-                        {durationLabel(seg.startTime, seg.endTime)}
+                      <div className="col-span-4 flex items-center justify-end gap-2">
+                        <span className="inline-flex items-center text-xs text-[#4ECBD9] bg-[#4ECBD9]/10 border border-[#4ECBD9]/30 rounded-full px-2 py-0.5">
+                          {durationLabel(seg.startTime, seg.endTime)}
+                        </span>
+                        <button onClick={() => removeSegmentRow(idx)} className="p-1 rounded hover:bg-neutral-700" title="Segment entfernen">
+                          <Trash className="w-4 h-4 text-[#F471B5]" />
+                        </button>
                       </div>
-                      <button onClick={() => removeSegmentRow(idx)} className="justify-self-end p-1 rounded hover:bg-neutral-700" title="Segment entfernen"><Trash className="w-4 h-4 text-[#F471B5]"/></button>
                     </div>
 
-                    {/* Sounds assignment (read-only). Editing erfolgt in der Soundliste/Zeitplan. */}
-                    <div className="space-y-2">
-                      <div className="text-xs text-[#C1C2C5] flex items-center justify-between">
-                        <span>Zugeordnete Sounds (schreibgeschützt)</span>
-                        <span className="text-[10px] text-neutral-400">Bearbeitung in der Soundliste → Zeitplan</span>
+                    {/* Row: assignments info (collapsed) */}
+                    {!isCollapsed && (
+                      <div className="mt-2 border-t border-neutral-700 pt-2">
+                        <div className="text-xs text-[#C1C2C5] flex items-center justify-between mb-1">
+                          <span>Zugeordnete Sounds (schreibgeschützt)</span>
+                          <span className="text-[10px] text-neutral-400">{assignments.length} Zuordnung{assignments.length!==1?'en':''} • Bearbeitung in der Soundliste → Zeitplan</span>
+                        </div>
+                        <div className="flex flex-wrap gap-1">
+                          {assignments.map((item, i) => {
+                            const id = typeof item === 'string' ? item : item.id;
+                            const t = typeof item === 'string' ? '' : (item.time || '');
+                            const s = sounds.find(x => x.id === id);
+                            return (
+                              <div key={id + '-' + i} className="text-xs px-2 py-1 rounded bg-neutral-800 border border-neutral-700 text-[#C1C2C5]">
+                                <span className="mr-2">{s?.name || id}</span>
+                                {t && <span className="text-neutral-400">{t.slice(0,5)}</span>}
+                              </div>
+                            );
+                          })}
+                          {assignments.length === 0 && (
+                            <div className="text-xs text-neutral-400">Keine Zuordnungen</div>
+                          )}
+                        </div>
                       </div>
-                      <div className="flex flex-wrap gap-1">
-                        {(workSoundsBySegment[seg.id] || []).map((item, i) => {
-                          const id = typeof item === 'string' ? item : item.id;
-                          const t = typeof item === 'string' ? '' : (item.time || '');
-                          const s = sounds.find(x => x.id === id);
-                          return (
-                            <div key={id + '-' + i} className="text-xs px-2 py-1 rounded bg-neutral-800 border border-neutral-700 text-[#C1C2C5]">
-                              <span className="mr-2">{s?.name || id}</span>
-                              {t && <span className="text-neutral-400">{t.slice(0,5)}</span>}
-                            </div>
-                          );
-                        })}
-                        {!(workSoundsBySegment[seg.id] || []).length && (
-                          <div className="text-xs text-neutral-400">Keine Zuordnungen</div>
-                        )}
-                      </div>
-                    </div>
+                    )}
                   </div>
-                ))}
+                );
+              })}
                 <div className="pt-2">
                   <button onClick={addSegmentRow} className="px-3 py-1.5 rounded bg-neutral-700 text-neutral-200 hover:bg-neutral-600 text-xs" title="Segment hinzufügen">
                     <Plus className="w-4 h-4 inline mr-1"/> Segment hinzufügen
