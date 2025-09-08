@@ -154,20 +154,24 @@ const SoundboardView: React.FC<{ mode?: SoundboardMode }> = ({ mode = 'normal' }
     <>
       {/* Remote compact header (iPad fix): show a small sticky header with login/logout if global header is hidden */}
       {isRemoteFavorites && (
-        <div className="sticky top-0 z-20 -mx-4 sm:mx-0 bg-neutral-900/90 backdrop-blur border-b border-neutral-800 px-4 sm:px-0 py-2">
+        <div className="sticky top-0 z-30 -mx-4 sm:mx-0 bg-neutral-900/90 backdrop-blur border-b border-neutral-800 px-4 sm:px-0 py-2">
           <div className="flex items-center justify-between text-sm">
             <div className="text-[#C1C2C5]">Remote</div>
             <div className="flex items-center gap-2">
               {!authed ? (
                 <button
-                  onClick={() => { try { window.location.href = '/'; } catch (_) {} }}
+                  type="button"
+                  onClick={() => { try { window.localStorage.removeItem('player_is_host'); } catch(_) {} try { window.location.assign('/'); } catch (_) {} }}
+                  onTouchStart={() => { try { window.localStorage.removeItem('player_is_host'); } catch(_) {} try { window.location.assign('/'); } catch (_) {} }}
                   className="px-2 h-7 rounded-lg border border-neutral-700 text-neutral-300 hover:bg-neutral-700/50"
                 >
                   Zur Anmeldung
                 </button>
               ) : (
                 <button
+                  type="button"
                   onClick={async () => { try { await logout(); } catch (_) {} finally { try { window.location.reload(); } catch {} } }}
+                  onTouchStart={async () => { try { await logout(); } catch (_) {} finally { try { window.location.reload(); } catch {} } }}
                   className="px-2 h-7 rounded-lg border border-neutral-700 text-neutral-300 hover:bg-neutral-700/50"
                 >
                   Abmelden
