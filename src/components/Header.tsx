@@ -1,5 +1,5 @@
 import React from 'react';
-import { Clock, LogOut } from 'lucide-react';
+import { Clock, LogOut, Menu, X } from 'lucide-react';
 import { useSounds } from '../context/SoundContext';
 import { useAuth } from '../hooks/useAuth';
 import { logout } from '../lib/api';
@@ -7,6 +7,7 @@ import { logout } from '../lib/api';
 const Header: React.FC = () => {
   const { isHost, setHostMode } = useSounds();
   const { authenticated } = useAuth();
+  const [mobileOpen, setMobileOpen] = React.useState(false);
   const [time, setTime] = React.useState(new Date().toLocaleTimeString([], { 
     hour: '2-digit', 
     minute: '2-digit', 
@@ -55,14 +56,41 @@ const Header: React.FC = () => {
   };
 
   return (
-    <header className="bg-[#1c1917]/80 border-b-[0.5px] border-[#4ECBD9]/20 backdrop-blur-sm">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4">
-        <div className="flex items-center justify-between">
-          
+    <header className="relative z-40 bg-[#1c1917]/80 border-b-[0.5px] border-[#4ECBD9]/20 backdrop-blur-sm">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3 sm:py-4">
+        {/* Mobile: compact top bar */}
+        <div className="flex items-center justify-between sm:hidden">
+          <button
+            onClick={() => setMobileOpen(true)}
+            onTouchStart={() => setMobileOpen(true)}
+            aria-label="Menü öffnen"
+            className="w-9 h-9 inline-flex items-center justify-center rounded-lg border border-neutral-700 text-neutral-300 hover:bg-neutral-700/50"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+          <h1 className="text-xl font-bold bg-gradient-to-r from-[#4ECBD9] to-[#F471B5] text-transparent bg-clip-text tracking-tight">
+            SoundScheduler
+          </h1>
+          {authenticated ? (
+            <button
+              onClick={handleLogout}
+              aria-label="Abmelden"
+              className="w-9 h-9 inline-flex items-center justify-center rounded-lg border border-neutral-700 text-neutral-300 hover:bg-neutral-700/50"
+              title="Abmelden"
+            >
+              <LogOut className="h-4 w-4" />
+            </button>
+          ) : (
+            <span className="w-9 h-9" />
+          )}
+        </div>
+
+        {/* Desktop: full header */}
+        <div className="hidden sm:flex items-center justify-between">
           {/* Clock */}
-          <div className="flex items-center space-x-2 bg-neutral-700/50 px-3 sm:px-4 py-2 rounded-xl border-[0.5px] border-[#4ECBD9]/10 shadow-glow-cyan">
+          <div className="flex items-center space-x-2 bg-neutral-700/50 px-4 py-2 rounded-xl border-[0.5px] border-[#4ECBD9]/10 shadow-glow-cyan">
             <Clock className="h-4 w-4 text-[#4ECBD9]" />
-            <div className="text-sm sm:text-base font-medium font-mono tracking-wider">
+            <div className="text-base font-medium font-mono tracking-wider">
               <span className="text-[#4ECBD9]">{time.split(':')[0]}</span>
               <span className="text-neutral-500 mx-0.5">:</span>
               <span className="text-[#4ECBD9]">{time.split(':')[1]}</span>
@@ -72,7 +100,7 @@ const Header: React.FC = () => {
           </div>
 
           {/* Logo/Title */}
-          <h1 className="text-2xl sm:text-4xl font-bold bg-gradient-to-r from-[#4ECBD9] to-[#F471B5] text-transparent bg-clip-text tracking-tight">
+          <h1 className="text-4xl font-bold bg-gradient-to-r from-[#4ECBD9] to-[#F471B5] text-transparent bg-clip-text tracking-tight">
             SoundScheduler
           </h1>
 
@@ -82,10 +110,8 @@ const Header: React.FC = () => {
               <button
                 onClick={() => setHostMode(true)}
                 aria-pressed={isHost}
-                className={`px-3 sm:px-4 py-2 text-sm transition-colors ${
-                  isHost
-                    ? 'bg-[#0d1718] text-[#4ECBD9] ring-1 ring-[#4ECBD9]/40'
-                    : 'text-neutral-300 hover:bg-neutral-600/40'
+                className={`px-4 py-2 text-sm transition-colors ${
+                  isHost ? 'bg-[#0d1718] text-[#4ECBD9] ring-1 ring-[#4ECBD9]/40' : 'text-neutral-300 hover:bg-neutral-600/40'
                 }`}
                 title="Dieses Gerät als Player (Host) festlegen"
               >
@@ -94,10 +120,8 @@ const Header: React.FC = () => {
               <button
                 onClick={() => setHostMode(false)}
                 aria-pressed={!isHost}
-                className={`px-3 sm:px-4 py-2 text-sm transition-colors ${
-                  !isHost
-                    ? 'bg-[#0d1718] text-[#4ECBD9] ring-1 ring-[#4ECBD9]/40'
-                    : 'text-neutral-300 hover:bg-neutral-600/40'
+                className={`px-4 py-2 text-sm transition-colors ${
+                  !isHost ? 'bg-[#0d1718] text-[#4ECBD9] ring-1 ring-[#4ECBD9]/40' : 'text-neutral-300 hover:bg-neutral-600/40'
                 }`}
                 title="Remote-Modus: Dieses Gerät sendet nur Play/Pause an den Host"
               >
@@ -107,16 +131,81 @@ const Header: React.FC = () => {
             {authenticated && (
               <button
                 onClick={handleLogout}
-                className="flex items-center space-x-2 px-3 sm:px-4 py-2 rounded-lg border-[0.5px] border-neutral-600/50 bg-neutral-700/50 text-neutral-400 hover:bg-neutral-600 hover:text-white active:bg-neutral-500 transition-all touch-manipulation"
+                className="flex items-center space-x-2 px-4 py-2 rounded-lg border-[0.5px] border-neutral-600/50 bg-neutral-700/50 text-neutral-400 hover:bg-neutral-600 hover:text-white active:bg-neutral-500 transition-all touch-manipulation"
                 title="Abmelden"
               >
                 <LogOut className="h-4 w-4" />
-                <span className="text-sm font-medium hidden sm:inline">Abmelden</span>
+                <span className="text-sm font-medium">Abmelden</span>
               </button>
             )}
           </div>
         </div>
       </div>
+
+      {/* Mobile overlay menu */}
+      {mobileOpen && (
+        <div className="sm:hidden fixed inset-0 z-50 bg-black/60" onClick={() => setMobileOpen(false)}>
+          <div
+            className="absolute top-0 left-0 right-0 bg-neutral-800 border-b border-neutral-700 rounded-b-xl p-4 pt-3 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-base font-semibold text-neutral-200">Menü</h2>
+              <button
+                onClick={() => setMobileOpen(false)}
+                aria-label="Menü schließen"
+                className="w-9 h-9 inline-flex items-center justify-center rounded-lg border border-neutral-700 text-neutral-300 hover:bg-neutral-700/50"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Clock */}
+            <div className="flex items-center justify-between bg-neutral-700/40 border border-neutral-600/40 rounded-lg px-3 py-2 mb-3">
+              <div className="flex items-center gap-2">
+                <Clock className="h-4 w-4 text-[#4ECBD9]" />
+                <span className="font-mono text-sm text-[#C1C2C5]">
+                  {time}
+                </span>
+              </div>
+            </div>
+
+            {/* Host/Remote toggle (compact) */}
+            <div className="flex bg-neutral-700/40 border border-neutral-600/50 rounded-lg overflow-hidden mb-3">
+              <button
+                onClick={() => setHostMode(true)}
+                aria-pressed={isHost}
+                className={`flex-1 px-2 py-1 text-xs transition-colors ${
+                  isHost ? 'bg-[#0d1718] text-[#4ECBD9] ring-1 ring-[#4ECBD9]/40' : 'text-neutral-300 hover:bg-neutral-600/40'
+                }`}
+              >
+                Host
+              </button>
+              <button
+                onClick={() => setHostMode(false)}
+                aria-pressed={!isHost}
+                className={`flex-1 px-2 py-1 text-xs transition-colors ${
+                  !isHost ? 'bg-[#0d1718] text-[#4ECBD9] ring-1 ring-[#4ECBD9]/40' : 'text-neutral-300 hover:bg-neutral-600/40'
+                }`}
+              >
+                Remote
+              </button>
+            </div>
+
+            {/* (On Air toggle removed per request) */}
+
+            {/* Logout */}
+            {authenticated && (
+              <button
+                onClick={handleLogout}
+                className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg border-[0.5px] border-neutral-600/50 bg-neutral-700/50 text-neutral-400 hover:bg-neutral-600 hover:text-white active:bg-neutral-500 transition-all"
+              >
+                <LogOut className="h-4 w-4" /> Abmelden
+              </button>
+            )}
+          </div>
+        </div>
+      )}
     </header>
   );
 };
