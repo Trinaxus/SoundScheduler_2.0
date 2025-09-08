@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { X, Plus, Edit2, Trash2, Check, Play, Pause, Star, StopCircle } from 'lucide-react';
+import { X, Plus, Edit2, Trash2, Check, Play, Pause, Star, Ban } from 'lucide-react';
 import { useSounds } from '../context/SoundContext';
 
 interface Props {
@@ -172,7 +172,7 @@ const CategoryManagerModal: React.FC<Props> = ({ open, onClose }) => {
                       aria-label="In/aus 'Ausgeblendet' verschieben"
                       title={(s.categoryId && (categories.find(c=>c.id===s.categoryId)?.name||'').toLowerCase()==='ausgeblendet') ? 'Aus "Ausgeblendet" entfernen' : 'In "Ausgeblendet" verschieben'}
                     >
-                      <StopCircle className={`w-4 h-4 ${
+                      <Ban className={`w-4 h-4 ${
                         (s.categoryId && (categories.find(c=>c.id===s.categoryId)?.name||'').toLowerCase()==='ausgeblendet')
                           ? 'text-[#F87171]'
                           : 'text-neutral-400'

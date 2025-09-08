@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { GripHorizontal, Star, Clock, Play, Pause, Music, Settings, StopCircle } from 'lucide-react';
+import { GripHorizontal, Star, Clock, Play, Pause, Music, Settings } from 'lucide-react';
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, DragOverlay } from '@dnd-kit/core';
 import { SortableContext, rectSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -13,16 +13,13 @@ type SoundboardMode = 'normal' | 'remoteFavorites';
 const SoundboardView: React.FC<{ mode?: SoundboardMode }> = ({ mode = 'normal' }) => {
   const { 
     sounds: originalSounds, 
-    playSound,
-    pauseSound,
     currentlyPlaying,
     categories,
     toggleFavorite,
-    toggleHiddenCategory,
     updateSoundOrder,
     currentTimeSeconds,
+    playOrRemote,
   } = useSounds();
-  const { playOrRemote } = useSounds() as any;
   
   const [sounds, setSounds] = useState<Sound[]>([]);
   const [filterCat, setFilterCat] = useState<string>('');
@@ -214,7 +211,6 @@ const SoundboardView: React.FC<{ mode?: SoundboardMode }> = ({ mode = 'normal' }
                               currentTimeSeconds={currentTimeSeconds}
                               onPlay={() => playOrRemote(sound.id)}
                               onToggleFavorite={() => {}}
-                              onToggleHidden={() => {}}
                             />
                           ))}
                         </div>
@@ -282,7 +278,6 @@ const SoundboardView: React.FC<{ mode?: SoundboardMode }> = ({ mode = 'normal' }
                               currentTimeSeconds={currentTimeSeconds}
                               onPlay={() => playOrRemote(sound.id)}
                               onToggleFavorite={() => toggleFavorite(sound.id)}
-                              onToggleHidden={() => toggleHiddenCategory(sound.id)}
                             />
                           ))}
                         </div>
@@ -304,7 +299,6 @@ const SoundboardView: React.FC<{ mode?: SoundboardMode }> = ({ mode = 'normal' }
                           colorFor={colorFor}
                           onPlay={() => {}}
                           onToggleFavorite={() => {}}
-                          onToggleHidden={() => {}}
                           currentTimeSeconds={currentTimeSeconds}
                         />
                       );
@@ -338,7 +332,6 @@ const SoundboardView: React.FC<{ mode?: SoundboardMode }> = ({ mode = 'normal' }
                       currentTimeSeconds={currentTimeSeconds}
                       onPlay={() => playOrRemote(sound.id)}
                       onToggleFavorite={() => toggleFavorite(sound.id)}
-                      onToggleHidden={() => toggleHiddenCategory(sound.id)}
                     />
                   ))}
                 </div>
@@ -384,7 +377,6 @@ type CardProps = {
   currentTimeSeconds: number;
   onPlay: () => void;
   onToggleFavorite: () => void;
-  onToggleHidden: () => void;
 };
 
 const SortableCard: React.FC<CardProps> = ({ id, ...rest }) => {
@@ -401,7 +393,7 @@ const SortableCard: React.FC<CardProps> = ({ id, ...rest }) => {
   );
 };
 
-const CardContent: React.FC<Omit<CardProps, 'id'>> = ({ sound, isActive, categories, colorFor, onPlay, onToggleFavorite, onToggleHidden, currentTimeSeconds }) => {
+const CardContent: React.FC<Omit<CardProps, 'id'>> = ({ sound, isActive, categories, colorFor, onPlay, onToggleFavorite, currentTimeSeconds }) => {
   return (
     <div
       onClick={onPlay}
@@ -423,19 +415,6 @@ const CardContent: React.FC<Omit<CardProps, 'id'>> = ({ sound, isActive, categor
                     ? 'fill-[#F471B5] text-[#F471B5]' 
                     : 'text-[#909296] hover:text-[#C1C2C5]'
                 }`} 
-              />
-            </button>
-            <button
-              onClick={(e) => { e.stopPropagation(); onToggleHidden(); }}
-              className="p-1.5 rounded-full hover:bg-black/10 transition-colors"
-              title={sound.categoryId && (categories.find(c=>c.id===sound.categoryId)?.name?.toLowerCase()==='ausgeblendet') ? 'Aus "Ausgeblendet" entfernen' : 'In "Ausgeblendet" verschieben'}
-            >
-              <StopCircle
-                className={`h-4 w-4 ${
-                  (sound.categoryId && (categories.find(c=>c.id===sound.categoryId)?.name?.toLowerCase()==='ausgeblendet'))
-                    ? 'text-[#F87171]'
-                    : 'text-[#909296] hover:text-[#C1C2C5]'
-                }`}
               />
             </button>
           </div>
