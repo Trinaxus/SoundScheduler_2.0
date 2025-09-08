@@ -147,6 +147,13 @@ switch ($action) {
 
   case 'reorder': {
     $orders = $body['orders'] ?? [];
+    // Allow orders to be sent as JSON string inside form-data
+    if (is_string($orders)) {
+      $decoded = json_decode($orders, true);
+      if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+        $orders = $decoded;
+      }
+    }
     if (!is_array($orders)) json_out(['error' => 'Invalid payload'], 400);
 
     $result = manifest_write(function(array $data) use ($orders) {

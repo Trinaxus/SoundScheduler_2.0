@@ -53,6 +53,12 @@ try {
         $name = $_POST['name'] ?? '';
         $segmentsJson = $_POST['segments'] ?? '[]';
         $segments = json_decode($segmentsJson, true);
+        $soundsBySegmentJson = $_POST['soundsBySegment'] ?? null;
+        $soundsBySegment = null;
+        if ($soundsBySegmentJson !== null) {
+            $tmp = json_decode($soundsBySegmentJson, true);
+            if (is_array($tmp)) $soundsBySegment = $tmp;
+        }
         if (!$id || !$name || !is_array($segments)) {
             http_response_code(400);
             echo json_encode(['error' => 'invalid payload']);
@@ -64,15 +70,22 @@ try {
             if (($p['id'] ?? '') === $id) {
                 $p['name'] = $name;
                 $p['segments'] = $segments;
+                if ($soundsBySegment !== null) {
+                    $p['soundsBySegment'] = $soundsBySegment;
+                }
                 $updated = true;
                 break;
             }
         }
         if (!$updated) {
-            $data['presets'][] = [ 'id' => $id, 'name' => $name, 'segments' => $segments ];
+            $preset = [ 'id' => $id, 'name' => $name, 'segments' => $segments ];
+            if ($soundsBySegment !== null) $preset['soundsBySegment'] = $soundsBySegment;
+            $data['presets'][] = $preset;
         }
         save_presets($file, $data);
-        echo json_encode(['ok' => true, 'preset' => [ 'id' => $id, 'name' => $name, 'segments' => $segments ]]);
+        $resp = [ 'id' => $id, 'name' => $name, 'segments' => $segments ];
+        if ($soundsBySegment !== null) $resp['soundsBySegment'] = $soundsBySegment;
+        echo json_encode(['ok' => true, 'preset' => $resp]);
         exit;
     }
 

@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { X, Plus, Save, Trash2, Edit2, Check, Copy, Trash } from 'lucide-react';
 import { presetsList, presetsUpsert, presetsDelete } from '../lib/api';
+import { timelineGet, timelineSave } from '../lib/api';
+import { useSounds } from '../context/SoundContext';
 
 export type TimelineSegment = {
   id: string;
@@ -19,7 +21,7 @@ interface Props {
   open: boolean;
   onClose: () => void;
   currentSegments: TimelineSegment[];
-  onApply: (segments: TimelineSegment[]) => void;
+  onApply: (segments: TimelineSegment[], meta: { id: string; name: string; soundsBySegment?: Record<string, Array<string | { id: string; time?: string }>> }) => void;
 }
 
 const PresetManagerModal: React.FC<Props> = ({ open, onClose, currentSegments, onApply }) => {
@@ -28,6 +30,8 @@ const PresetManagerModal: React.FC<Props> = ({ open, onClose, currentSegments, o
   const [newName, setNewName] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState<string>('');
+  const { sounds } = useSounds();
+  const [activePresetId, setActivePresetId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -41,6 +45,10 @@ const PresetManagerModal: React.FC<Props> = ({ open, onClose, currentSegments, o
         } else {
           setSelectedId(null);
         }
+        try {
+          const tl = await timelineGet();
+          setActivePresetId((tl as any).activePresetId || null);
+        } catch {}
       } catch (e) {
         // Silent fail -> empty list
         setPresets([]);
@@ -63,7 +71,7 @@ const PresetManagerModal: React.FC<Props> = ({ open, onClose, currentSegments, o
       segments: currentSegments.map(s => ({ ...s })),
     };
     try {
-      await presetsUpsert({ id: preset.id, name: preset.name, segments: preset.segments });
+      await presetsUpsert({ id: preset.id, name: preset.name, segments: preset.segments, soundsBySegment: {} });
       const next = [...presets, preset];
       persistReplace(next);
       setSelectedId(preset.id);
@@ -72,7 +80,10 @@ const PresetManagerModal: React.FC<Props> = ({ open, onClose, currentSegments, o
   };
 
   const applyPreset = (p: Preset) => {
-    onApply(p.segments.map(s => ({ ...s }))); // pass a copy
+    onApply(
+      p.segments.map(s => ({ ...s })), // pass a copy
+      { id: p.id, name: p.name, soundsBySegment: workSoundsBySegment }
+    );
     onClose();
   };
 
@@ -92,17 +103,62 @@ const PresetManagerModal: React.FC<Props> = ({ open, onClose, currentSegments, o
     const name = editingName.trim();
     if (!name) return;
     const updated = presets.map(x => x.id === p.id ? { ...x, name } : x);
-    try { await presetsUpsert({ id: p.id, name, segments: (selectedPreset?.segments || p.segments) }); } catch {}
+    try { await presetsUpsert({ id: p.id, name, segments: (selectedPreset?.segments || p.segments), soundsBySegment: (selectedPreset as any)?.soundsBySegment }); } catch {}
     persistReplace(updated);
     setEditingId(null);
     setEditingName('');
   };
 
   const [workSegments, setWorkSegments] = useState<TimelineSegment[]>([]);
+  const [workSoundsBySegment, setWorkSoundsBySegment] = useState<Record<string, Array<{ id: string; time?: string }>>>({});
   useEffect(() => {
-    if (selectedPreset) setWorkSegments(selectedPreset.segments.map(s => ({ ...s })));
-    else setWorkSegments([]);
+    if (selectedPreset) {
+      setWorkSegments(selectedPreset.segments.map(s => ({ ...s })));
+      setWorkSoundsBySegment((selectedPreset as any).soundsBySegment || {});
+    } else {
+      setWorkSegments([]);
+      setWorkSoundsBySegment({});
+    }
   }, [selectedPreset?.id]);
+
+  const isTimeInRange = (t: string, start: string, end: string) => {
+    const tt = t.length === 5 ? `${t}:00` : t;
+    return tt >= start && tt <= end;
+  };
+
+  const buildMappingFromSchedules = (): Record<string, Array<{ id: string; time?: string }>> => {
+    const map: Record<string, Array<{ id: string; time?: string }>> = {};
+    for (const seg of workSegments) {
+      const arr: Array<{ id: string; time?: string }> = [];
+      sounds.forEach(s => {
+        (s.schedules || []).forEach(sch => {
+          if (isTimeInRange(sch.time, seg.startTime, seg.endTime)) {
+            arr.push({ id: s.id, time: sch.time });
+          }
+        });
+      });
+      map[seg.id] = arr;
+    }
+    return map;
+  };
+
+  const persistMapping = async (nextMap: Record<string, Array<{ id: string; time?: string }>>) => {
+    if (!selectedPreset) return;
+    await presetsUpsert({ id: selectedPreset.id, name: selectedPreset.name, segments: selectedPreset.segments, soundsBySegment: nextMap });
+    // If selected is active, also persist into timeline
+    try {
+      const tl = await timelineGet();
+      const tlSegments = (tl as any).segments as Array<{ id: string; title: string; startTime: string; endTime: string }> | undefined;
+      if (activePresetId && selectedPreset.id === activePresetId) {
+        await timelineSave((tl as any).mutedSchedules || [], (tl as any).mutedSegments || [], tlSegments, {
+          activePresetId: selectedPreset.id,
+          activePresetName: selectedPreset.name,
+          soundsBySegment: nextMap,
+        });
+        try { window.dispatchEvent(new CustomEvent('timeline:updated')); } catch {}
+      }
+    } catch {}
+  };
 
   const updateSeg = (idx: number, patch: Partial<TimelineSegment>) => {
     setWorkSegments(prev => prev.map((s, i) => i === idx ? { ...s, ...patch } : s));
@@ -110,8 +166,8 @@ const PresetManagerModal: React.FC<Props> = ({ open, onClose, currentSegments, o
 
   const saveEditedSegments = async () => {
     if (!selectedPreset) return;
-    const updated = presets.map(p => p.id === selectedPreset.id ? { ...p, segments: workSegments } : p);
-    try { await presetsUpsert({ id: selectedPreset.id, name: selectedPreset.name, segments: workSegments }); } catch {}
+    const updated = presets.map(p => p.id === selectedPreset.id ? { ...p, segments: workSegments, soundsBySegment: workSoundsBySegment } : p);
+    try { await presetsUpsert({ id: selectedPreset.id, name: selectedPreset.name, segments: workSegments, soundsBySegment: workSoundsBySegment }); } catch {}
     persistReplace(updated);
   };
 
@@ -121,7 +177,7 @@ const PresetManagerModal: React.FC<Props> = ({ open, onClose, currentSegments, o
       name: `${p.name} (Kopie)`,
       segments: p.segments.map(s => ({ ...s })),
     };
-    try { await presetsUpsert({ id: copy.id, name: copy.name, segments: copy.segments }); } catch {}
+    try { await presetsUpsert({ id: copy.id, name: copy.name, segments: copy.segments, soundsBySegment: (p as any).soundsBySegment }); } catch {}
     persistReplace([...presets, copy]);
   };
 
@@ -232,35 +288,72 @@ const PresetManagerModal: React.FC<Props> = ({ open, onClose, currentSegments, o
                   <button onClick={() => applyPreset(selectedPreset)} className="px-3 py-1.5 rounded bg-neutral-700 text-neutral-200 hover:bg-neutral-600 text-xs" title="Preset anwenden">
                     Anwenden
                   </button>
+                  <button
+                    onClick={async () => {
+                      const map = buildMappingFromSchedules();
+                      setWorkSoundsBySegment(map);
+                      await persistMapping(map);
+                    }}
+                    className="px-3 py-1.5 rounded bg-neutral-700 text-neutral-200 hover:bg-neutral-600 text-xs"
+                    title="Zuordnungen aus aktuellen Zeitplänen erzeugen"
+                  >
+                    Aus Zeitplänen übernehmen
+                  </button>
                 </div>
               )}
             </div>
             {selectedPreset ? (
-              <div className="space-y-2">
+              <div className="space-y-4">
                 {workSegments.map((seg, idx) => (
-                  <div key={seg.id} className="grid grid-cols-1 sm:grid-cols-7 gap-2 bg-neutral-700/20 rounded-lg p-3 items-center">
-                    <input
-                      value={seg.title}
-                      onChange={e => updateSeg(idx, { title: e.target.value })}
-                      className="bg-neutral-800 border border-neutral-700 rounded px-2 py-1 text-sm text-[#C1C2C5] sm:col-span-3"
-                      placeholder="Titel"
-                    />
-                    <input
-                      type="time"
-                      value={seg.startTime.slice(0,5)}
-                      onChange={e => updateSeg(idx, { startTime: e.target.value + ':00' })}
-                      className="bg-neutral-800 border border-neutral-700 rounded px-2 py-1 text-sm text-[#C1C2C5]"
-                    />
-                    <input
-                      type="time"
-                      value={seg.endTime.slice(0,5)}
-                      onChange={e => updateSeg(idx, { endTime: e.target.value + ':00' })}
-                      className="bg-neutral-800 border border-neutral-700 rounded px-2 py-1 text-sm text-[#C1C2C5]"
-                    />
-                    <div className="inline-flex items-center text-xs text-[#4ECBD9] bg-[#4ECBD9]/10 border border-[#4ECBD9]/30 rounded-full px-2 py-0.5 shadow-[0_0_8px_rgba(78,203,217,0.15)]">
-                      {durationLabel(seg.startTime, seg.endTime)}
+                  <div key={seg.id} className="space-y-2 bg-neutral-700/20 rounded-lg p-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-7 gap-2 items-center">
+                      <input
+                        value={seg.title}
+                        onChange={e => updateSeg(idx, { title: e.target.value })}
+                        className="bg-neutral-800 border border-neutral-700 rounded px-2 py-1 text-sm text-[#C1C2C5] sm:col-span-3"
+                        placeholder="Titel"
+                      />
+                      <input
+                        type="time"
+                        value={seg.startTime.slice(0,5)}
+                        onChange={e => updateSeg(idx, { startTime: e.target.value + ':00' })}
+                        className="bg-neutral-800 border border-neutral-700 rounded px-2 py-1 text-sm text-[#C1C2C5]"
+                      />
+                      <input
+                        type="time"
+                        value={seg.endTime.slice(0,5)}
+                        onChange={e => updateSeg(idx, { endTime: e.target.value + ':00' })}
+                        className="bg-neutral-800 border border-neutral-700 rounded px-2 py-1 text-sm text-[#C1C2C5]"
+                      />
+                      <div className="inline-flex items-center text-xs text-[#4ECBD9] bg-[#4ECBD9]/10 border border-[#4ECBD9]/30 rounded-full px-2 py-0.5 shadow-[0_0_8px_rgba(78,203,217,0.15)]">
+                        {durationLabel(seg.startTime, seg.endTime)}
+                      </div>
+                      <button onClick={() => removeSegmentRow(idx)} className="justify-self-end p-1 rounded hover:bg-neutral-700" title="Segment entfernen"><Trash className="w-4 h-4 text-[#F471B5]"/></button>
                     </div>
-                    <button onClick={() => removeSegmentRow(idx)} className="justify-self-end p-1 rounded hover:bg-neutral-700" title="Segment entfernen"><Trash className="w-4 h-4 text-[#F471B5]"/></button>
+
+                    {/* Sounds assignment (read-only). Editing erfolgt in der Soundliste/Zeitplan. */}
+                    <div className="space-y-2">
+                      <div className="text-xs text-[#C1C2C5] flex items-center justify-between">
+                        <span>Zugeordnete Sounds (schreibgeschützt)</span>
+                        <span className="text-[10px] text-neutral-400">Bearbeitung in der Soundliste → Zeitplan</span>
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {(workSoundsBySegment[seg.id] || []).map((item, i) => {
+                          const id = typeof item === 'string' ? item : item.id;
+                          const t = typeof item === 'string' ? '' : (item.time || '');
+                          const s = sounds.find(x => x.id === id);
+                          return (
+                            <div key={id + '-' + i} className="text-xs px-2 py-1 rounded bg-neutral-800 border border-neutral-700 text-[#C1C2C5]">
+                              <span className="mr-2">{s?.name || id}</span>
+                              {t && <span className="text-neutral-400">{t.slice(0,5)}</span>}
+                            </div>
+                          );
+                        })}
+                        {!(workSoundsBySegment[seg.id] || []).length && (
+                          <div className="text-xs text-neutral-400">Keine Zuordnungen</div>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 ))}
                 <div className="pt-2">

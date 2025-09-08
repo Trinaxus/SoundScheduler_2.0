@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
-import { Play, Pause, X, Clock, Edit, Save } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Play, Pause, X, Clock, Edit, Save, Search, RefreshCw, MoreVertical } from 'lucide-react';
 import { useSounds } from '../context/SoundContext';
 import { formatFileSize, formatDuration, formatTime } from '../utils/helpers';
 import ScheduleEditor from './ScheduleEditor';
 import SoundUploader from './SoundUploader';
+import { timelineGet, soundsResync } from '../lib/api';
 // Cover removed: no API_BASE required
 
 const SoundList: React.FC = () => {
@@ -15,6 +16,7 @@ const SoundList: React.FC = () => {
     deleteSound,
     renameSound,
     categories,
+    reloadManifest,
   } = useSounds();
 
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -22,6 +24,47 @@ const SoundList: React.FC = () => {
   const [expandedSchedulerId, setExpandedSchedulerId] = useState<string | null>(null);
   const [filterCat, setFilterCat] = useState<string>('');
   const [uploadOpen, setUploadOpen] = useState<boolean>(false);
+  const [search, setSearch] = useState<string>('');
+  const [activePresetName, setActivePresetName] = useState<string | null>(null);
+  const [timelineSegments, setTimelineSegments] = useState<Array<{ id: string; title: string; startTime: string; endTime: string }>>([]);
+  const [soundsBySegment, setSoundsBySegment] = useState<Record<string, Array<string | { id: string; time?: string }>>>({});
+  const [menuOpen, setMenuOpen] = useState<boolean>(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const data = await timelineGet();
+        setActivePresetName((data as any).activePresetName || null);
+        if ((data as any).segments) setTimelineSegments(((data as any).segments || []) as Array<{ id: string; title: string; startTime: string; endTime: string }>);
+        if ((data as any).soundsBySegment) setSoundsBySegment((data as any).soundsBySegment as Record<string, Array<string | { id: string; time?: string }>>);
+      } catch {}
+    })();
+    const onTlUpdate = async () => {
+      try {
+        const data = await timelineGet();
+        setActivePresetName((data as any).activePresetName || null);
+        if ((data as any).segments) setTimelineSegments(((data as any).segments || []) as Array<{ id: string; title: string; startTime: string; endTime: string }>);
+        if ((data as any).soundsBySegment) setSoundsBySegment((data as any).soundsBySegment as Record<string, Array<string | { id: string; time?: string }>>);
+      } catch {}
+    };
+    window.addEventListener('timeline:updated', onTlUpdate as any);
+    return () => window.removeEventListener('timeline:updated', onTlUpdate as any);
+  }, []);
+
+  const isTimeInRange = (t: string, start: string, end: string) => {
+    const tt = t.length === 5 ? `${t}:00` : t;
+    return tt >= start && tt <= end;
+  };
+
+  const scheduleInPreset = (soundId: string, time: string) => {
+    if (!Object.keys(soundsBySegment).length) return true; // no mapping -> show all
+    const seg = timelineSegments.find(s => isTimeInRange(time, s.startTime, s.endTime));
+    if (!seg) return false;
+    const raw = soundsBySegment[seg.id];
+    if (!Array.isArray(raw)) return false; // limited but missing entry -> hide
+    const allowedIds = new Set(raw.map(x => (typeof x === 'string' ? x : x.id)));
+    return allowedIds.has(soundId);
+  };
 
   const handleStartEditing = (id: string, currentName: string) => {
     setEditingId(id);
@@ -41,57 +84,107 @@ const SoundList: React.FC = () => {
 
   if (sounds.length === 0) {
     return (
-      <div className="text-center py-10">
-        <div className="mb-4 flex justify-center">
-          <div className="bg-[#4ECBD9]/10 p-3 rounded-full">
-            <Clock className="h-8 w-8 text-[#4ECBD9]" />
+      <div className="space-y-4">
+        <div className="text-center py-8">
+          <div className="mb-4 flex justify-center">
+            <div className="bg-[#4ECBD9]/10 p-3 rounded-full">
+              <Clock className="h-8 w-8 text-[#4ECBD9]" />
+            </div>
+          </div>
+          <h3 className="text-lg font-medium text-[#C1C2C5] mb-1">Keine Sounds</h3>
+          <p className="text-sm text-[#909296] mb-4">Lade Audiodateien hoch oder aktualisiere den Bestand.</p>
+          <div className="flex items-center justify-center gap-3">
+            <button onClick={() => reloadManifest()} className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-neutral-800 text-[#C1C2C5] border border-neutral-700 hover:bg-neutral-700">
+              <RefreshCw className="w-4 h-4" /> Aktualisieren
+            </button>
+            <button onClick={async () => { try { await soundsResync(); await reloadManifest(); } catch (e) { console.error(e); } }} className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-neutral-800 text-[#C1C2C5] border border-neutral-700 hover:bg-neutral-700">
+              Uploads scannen
+            </button>
           </div>
         </div>
-        <h3 className="text-lg font-medium text-[#C1C2C5] mb-1">Keine Sounds</h3>
-        <p className="text-sm text-[#909296]">
-          Lade Audiodateien hoch, um sie für die Wiedergabe zu planen
-        </p>
+        <div className="bg-neutral-800/80 rounded-xl p-3 sm:p-6 border border-neutral-700/30">
+          <div className="mb-3">
+            <h3 className="text-sm font-semibold text-neutral-100">Audiodateien hochladen</h3>
+            <p className="text-xs text-neutral-400">Drag & Drop • Mehrfach-Upload • Fortschritt</p>
+          </div>
+          <SoundUploader />
+        </div>
       </div>
     );
   }
 
-  const visibleSounds = sounds.filter(s => !filterCat || s.categoryId === filterCat);
+  const term = search.trim().toLowerCase();
+  const visibleSounds = sounds
+    .filter(s => !filterCat || s.categoryId === filterCat)
+    .filter(s => term ? (s.name || '').toLowerCase().includes(term) : true);
 
   return (
     <div className="space-y-4">
       {/* Sticky filter bar + plus button for mobile */}
       <div className="sticky -mx-4 sm:mx-0 top-0 z-10 bg-neutral-900/85 backdrop-blur border-b border-neutral-800 px-4 sm:px-0 pt-2 pb-2">
-        <div className="flex items-center justify-between">
-          <div className="flex flex-wrap gap-2">
-            <button
-              onClick={() => setFilterCat('')}
-              className={`appearance-none p-0 inline-flex items-center justify-center min-h-[24px] h-[24px] px-4 rounded-full text-[12px] sm:text-sm border leading-none ${filterCat === '' ? 'bg-[#0d1718] text-[#4ECBD9] border-transparent ring-1 ring-[#4ECBD9]/40' : 'bg-neutral-800 text-[#C1C2C5] border-neutral-700 hover:bg-neutral-700'}`}
-            >
-              Alle
-            </button>
-            {categories.map((c) => (
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex flex-col gap-3 w-full sm:w-auto">
+            <div className="relative max-w-sm w-full">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Suche Jingles..."
+                className="w-full pl-9 pr-3 py-2 rounded-lg bg-neutral-700/50 border border-neutral-600 text-sm text-[#C1C2C5] placeholder:text-neutral-500 focus:outline-none focus:ring-1 focus:ring-[#4ECBD9]/40"
+              />
+            </div>
+            <div className="flex flex-wrap gap-2">
               <button
-                key={c.id}
-                onClick={() => setFilterCat(c.id)}
-                className={`appearance-none p-0 inline-flex items-center justify-center min-h-[24px] h-[24px] px-4 rounded-full text-[12px] sm:text-sm border leading-none ${filterCat === c.id ? 'bg-[#0d1718] text-[#4ECBD9] border-transparent ring-1 ring-[#4ECBD9]/40' : 'bg-neutral-800 text-[#C1C2C5] border-neutral-700 hover:bg-neutral-700'}`}
+                onClick={() => setFilterCat('')}
+                className={`appearance-none p-0 inline-flex items-center justify-center min-h-[24px] h-[24px] px-4 rounded-full text-[12px] sm:text-sm border leading-none ${filterCat === '' ? 'bg-[#0d1718] text-[#4ECBD9] border-transparent ring-1 ring-[#4ECBD9]/40' : 'bg-neutral-800 text-[#C1C2C5] border-neutral-700 hover:bg-neutral-700'}`}
               >
-                {c.name}
+                Alle
               </button>
-            ))}
+              {categories.map((c) => (
+                <button
+                  key={c.id}
+                  onClick={() => setFilterCat(c.id)}
+                  className={`appearance-none p-0 inline-flex items-center justify-center min-h-[24px] h-[24px] px-4 rounded-full text-[12px] sm:text-sm border leading-none ${filterCat === c.id ? 'bg-[#0d1718] text-[#4ECBD9] border-transparent ring-1 ring-[#4ECBD9]/40' : 'bg-neutral-800 text-[#C1C2C5] border-neutral-700 hover:bg-neutral-700'}`}
+                >
+                  {c.name}
+                </button>
+              ))}
+            </div>
           </div>
-          <button
-            onClick={() => setUploadOpen(v => !v)}
-            className={`inline-flex items-center justify-center h-7 w-7 rounded-lg transition-colors ${uploadOpen ? 'bg-[#4ECBD9]/20 text-[#4ECBD9]' : 'bg-[#4ECBD9]/10 text-[#4ECBD9] hover:bg-[#4ECBD9]/20'}`}
-            title={uploadOpen ? 'Upload-Bereich schließen' : 'Upload-Bereich öffnen'}
-            aria-expanded={uploadOpen}
-            aria-controls="soundlist-upload"
-          >
-            {/* Using a simple plus via CSS rotates when open */}
-            <span className={`block w-4 h-4 relative`}> 
-              <span className={`absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 h-0.5 w-4 bg-current transition-transform ${uploadOpen ? 'rotate-45' : ''}`} />
-              <span className={`absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 h-4 w-0.5 bg-current transition-transform ${uploadOpen ? '-rotate-45' : ''}`} />
-            </span>
-          </button>
+          <div className="relative">
+            <button
+              onClick={() => setMenuOpen(o => !o)}
+              className="inline-flex items-center justify-center h-8 w-8 rounded-lg bg-neutral-800 text-neutral-300 border border-neutral-700 hover:bg-neutral-700"
+              aria-haspopup="menu"
+              aria-expanded={menuOpen}
+              title="Aktionen"
+            >
+              <MoreVertical className="w-4 h-4" />
+            </button>
+            {menuOpen && (
+              <div className="absolute right-0 mt-2 w-48 bg-neutral-800 border border-neutral-700 rounded-lg shadow-xl z-20">
+                <button
+                  onClick={() => { setUploadOpen(v => !v); setMenuOpen(false); }}
+                  className="w-full text-left px-3 py-2 text-sm text-[#C1C2C5] hover:bg-neutral-700/70"
+                >
+                  {uploadOpen ? 'Upload-Bereich schließen' : 'Upload-Bereich öffnen'}
+                </button>
+                <button
+                  onClick={async () => { setMenuOpen(false); await reloadManifest(); }}
+                  className="w-full text-left px-3 py-2 text-sm text-[#C1C2C5] hover:bg-neutral-700/70"
+                >
+                  <span className="inline-flex items-center gap-2"><RefreshCw className="w-4 h-4"/> Aktualisieren</span>
+                </button>
+                <button
+                  onClick={async () => { setMenuOpen(false); try { await soundsResync(); await reloadManifest(); } catch (e) { console.error(e); } }}
+                  className="w-full text-left px-3 py-2 text-sm text-[#C1C2C5] hover:bg-neutral-700/70"
+                >
+                  Uploads scannen
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -281,9 +374,12 @@ const SoundList: React.FC = () => {
                     <div className="flex px-2 py-1 rounded-md bg-black/20 group-hover:bg-black/30 transition-colors">
                       <Clock className="h-4 w-4 text-[#909296] mr-1" />
                       <span className="text-xs font-medium text-[#C1C2C5]">
-                        {sound.schedules.length === 0
-                          ? 'Zeitplan hinzufügen'
-                          : `${sound.schedules.length} Zeitplan${sound.schedules.length > 1 ? 'e' : ''}`}
+                        {(() => {
+                          if (sound.schedules.length === 0) return 'Zeitplan hinzufügen';
+                          const filtered = sound.schedules.filter(sch => scheduleInPreset(sound.id, sch.time));
+                          const count = Object.keys(soundsBySegment).length ? filtered.length : sound.schedules.length;
+                          return `${count} Zeitplan${count !== 1 ? 'e' : ''}`;
+                        })()}
                       </span>
                     </div>
                   </div>
@@ -309,7 +405,7 @@ const SoundList: React.FC = () => {
             {sound.schedules.length > 0 && expandedSchedulerId !== sound.id && (
               <div className="px-3 sm:px-4 pb-3 pt-0">
                 <div className="flex flex-wrap gap-1 sm:gap-1.5 mt-2">
-                  {sound.schedules.map((schedule) => (
+                  {(Object.keys(soundsBySegment).length ? sound.schedules.filter(sch => scheduleInPreset(sound.id, sch.time)) : sound.schedules).map((schedule) => (
                     <div
                       key={schedule.id}
                       className={`text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 sm:py-1 rounded ${

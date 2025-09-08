@@ -54,6 +54,7 @@ interface SoundContextType {
   toggleSegmentMute: (segmentId: string) => void;
   setHostMode: (host: boolean) => void;
   playOrRemote: (soundId: string) => Promise<void>;
+  reloadManifest: () => Promise<void>;
 }
 
 const SUPPORTED_AUDIO_TYPES = [
@@ -127,39 +128,39 @@ export const SoundProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const DEBOUNCE_TIME = 300; // 300ms debounce for play/pause actions
   const lastRemoteTsRef = useRef<number>(0);
 
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const manifest = await getManifest();
-        const mapped: Sound[] = (manifest.sounds || []).map((s: any) => ({
-          id: s.id,
-          name: s.name,
-          url: s.url,
-          size: s.size,
-          type: s.type,
-          duration: s.duration ?? 0,
-          file: new File([], s.name, { type: s.type || 'audio/mpeg' }),
-          schedules: (manifest.schedules || []).filter((sch: any) => sch.sound_id === s.id).map((sch: any) => ({
-            id: sch.id,
-            time: sch.time,
-            active: sch.active,
-            lastPlayed: sch.last_played ?? undefined,
-          })) as Schedule[],
-          isFavorite: !!s.is_favorite,
-          order: s.display_order ?? 0,
-          categoryId: s.category_id ?? null,
-        }));
-        // sort by display_order
-        mapped.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-        setSounds(mapped);
-        setManifestVersion(manifest.version);
-        setCategories((manifest.categories || []).map((c:any)=>({ id:c.id, name:c.name, display_order:c.display_order })));
-      } catch (e) {
-        console.error('Error loading manifest:', e);
-      }
-    };
+  const reloadManifest = useCallback(async (): Promise<void> => {
+    try {
+      const manifest = await getManifest();
+      const mapped: Sound[] = (manifest.sounds || []).map((s: any) => ({
+        id: s.id,
+        name: s.name,
+        url: s.url,
+        size: s.size,
+        type: s.type,
+        duration: s.duration ?? 0,
+        file: new File([], s.name, { type: s.type || 'audio/mpeg' }),
+        schedules: (manifest.schedules || []).filter((sch: any) => sch.sound_id === s.id).map((sch: any) => ({
+          id: sch.id,
+          time: sch.time,
+          active: sch.active,
+          lastPlayed: sch.last_played ?? undefined,
+        })) as Schedule[],
+        isFavorite: !!s.is_favorite,
+        order: s.display_order ?? 0,
+        categoryId: s.category_id ?? null,
+      }));
+      // sort by display_order
+      mapped.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+      setSounds(mapped);
+      setManifestVersion(manifest.version);
+      setCategories((manifest.categories || []).map((c:any)=>({ id:c.id, name:c.name, display_order:c.display_order })));
+    } catch (e) {
+      console.error('Error loading manifest:', e);
+    }
+  }, []);
 
-    load();
+  useEffect(() => {
+    reloadManifest();
 
     const initAudioContext = () => {
       if (!audioContext) {
@@ -181,7 +182,7 @@ export const SoundProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         audioContext.close();
       }
     };
-  }, []);
+  }, [reloadManifest]);
 
   // (moved below playSound/pauseSound declarations)
 
@@ -714,6 +715,7 @@ export const SoundProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     toggleSegmentMute,
     setHostMode,
     playOrRemote,
+    reloadManifest,
   };
 
   return <SoundContext.Provider value={value}>{children}</SoundContext.Provider>;

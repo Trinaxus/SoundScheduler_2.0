@@ -9,7 +9,11 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
   json_out(['error' => 'Method not allowed'], 405);
 }
 
-require_admin();
+// Allow anonymous resync if enabled via env; otherwise require admin
+$allowAnonResync = ($_ENV['ALLOW_ANON_RESYNC'] ?? '') === 'true';
+if (!$allowAnonResync) {
+  require_admin();
+}
 
 // Build current set of known file_paths in manifest
 $manifest = manifest_read();

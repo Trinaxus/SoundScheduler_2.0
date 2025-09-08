@@ -5,7 +5,11 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
   json_out(['error' => 'Method not allowed'], 405);
 }
 
-require_admin();
+// Allow anonymous uploads if enabled via env; otherwise require admin
+$allowAnon = ($_ENV['ALLOW_ANON_UPLOADS'] ?? '') === 'true';
+if (!$allowAnon) {
+  require_admin();
+}
 
 if (empty($_FILES['file']) || !is_uploaded_file($_FILES['file']['tmp_name'])) {
   json_out(['error' => 'No file uploaded'], 400);

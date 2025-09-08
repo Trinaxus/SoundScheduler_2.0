@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Plus, Trash, Save, X, Clock, Edit2 } from 'lucide-react';
 import { Schedule } from '../types';
 import { useSounds } from '../context/SoundContext';
 import { formatTime } from '../utils/helpers';
+import { timelineGet, timelineSave, presetsList, presetsUpsert } from '../lib/api';
 
 interface ScheduleEditorProps {
   soundId: string;
@@ -20,13 +21,23 @@ const ScheduleEditor: React.FC<ScheduleEditorProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTime, setEditTime] = useState<string>('');
+  const [presetInfo, setPresetInfo] = useState<{ id: string | null; name: string | null } | null>(null);
+  const [timelineSegments, setTimelineSegments] = useState<Array<{ id: string; title: string; startTime: string; endTime: string }>>([]);
+  const [soundsBySegment, setSoundsBySegment] = useState<Record<string, Array<string | { id: string; time?: string }>>>({});
 
   const handleAddSchedule = async (e: React.FormEvent) => {
     e.preventDefault(); // Prevent form submission
     if (newTime && !isSubmitting) {
       try {
         setIsSubmitting(true);
-        await addSchedule(soundId, newTime + ':00'); // Add seconds
+        const full = newTime.length === 5 ? `${newTime}:00` : newTime; // normalize HH:mm -> HH:mm:ss
+        // avoid duplicates if same time already exists
+        const exists = (schedules || []).some(s => s.time === full);
+        if (!exists) {
+          await addSchedule(soundId, full);
+        }
+        // Also persist into active preset mapping
+        await persistTimeIntoActivePreset(newTime);
         setNewTime('');
       } finally {
         setIsSubmitting(false);
@@ -34,11 +45,149 @@ const ScheduleEditor: React.FC<ScheduleEditorProps> = ({
     }
   };
 
+  const persistTimeIntoActivePreset = async (timeHHmm: string) => {
+    if (!presetInfo?.id) return;
+    try {
+      const lists = await presetsList();
+      const preset = (lists.presets || []).find(p => p.id === presetInfo.id);
+      if (!preset) return;
+      // Find segment for this time
+      const seg = timelineSegments.find(s => isTimeInRange(timeHHmm, s.startTime, s.endTime));
+      if (!seg) return;
+      // Normalize mapping
+      const existingMap = (preset as any).soundsBySegment as Record<string, Array<string | { id: string; time?: string }>> || {};
+      const current = (existingMap[seg.id] || []).map(x => (typeof x === 'string' ? { id: x } : x));
+      const normalizedTime = timeHHmm.length === 5 ? `${timeHHmm}:00` : timeHHmm;
+      const has = current.some(x => x.id === soundId && x.time === normalizedTime);
+      if (!has) current.push({ id: soundId, time: normalizedTime });
+      const nextMap: Record<string, Array<string | { id: string; time?: string }>> = { ...existingMap, [seg.id]: current };
+      await presetsUpsert({ id: preset.id, name: preset.name, segments: preset.segments, soundsBySegment: nextMap });
+      // Persist also into timeline so Timeline/Soundlist reflect immediately
+      try {
+        const tl = await timelineGet();
+        const tlSegments = (tl as any).segments as Array<{ id: string; title: string; startTime: string; endTime: string }> | undefined;
+        await timelineSave((tl as any).mutedSchedules || [], (tl as any).mutedSegments || [], tlSegments, {
+          activePresetId: preset.id,
+          activePresetName: preset.name,
+          soundsBySegment: nextMap,
+        });
+        // notify other views
+        try { window.dispatchEvent(new CustomEvent('timeline:updated')); } catch {}
+      } catch {}
+      setSoundsBySegment(nextMap);
+    } catch {}
+  };
+
+  const persistRemoveFromActivePreset = async (timeHHmmss: string) => {
+    if (!presetInfo?.id) return;
+    try {
+      const lists = await presetsList();
+      const preset = (lists.presets || []).find(p => p.id === presetInfo.id);
+      if (!preset) return;
+      const timeHHmm = timeHHmmss.slice(0,5);
+      const seg = timelineSegments.find(s => isTimeInRange(timeHHmm, s.startTime, s.endTime));
+      if (!seg) return;
+      const existingMap = (preset as any).soundsBySegment as Record<string, Array<string | { id: string; time?: string }>> || {};
+      const current = (existingMap[seg.id] || []).map(x => (typeof x === 'string' ? { id: x } : x));
+      const normalizedTime = timeHHmmss.length === 5 ? `${timeHHmmss}:00` : timeHHmmss;
+      const pruned = current.filter(x => !(x.id === soundId && (x.time || '') === normalizedTime));
+      const nextMap: Record<string, Array<string | { id: string; time?: string }>> = { ...existingMap, [seg.id]: pruned };
+      await presetsUpsert({ id: preset.id, name: preset.name, segments: preset.segments, soundsBySegment: nextMap });
+      try {
+        const tl = await timelineGet();
+        await timelineSave((tl as any).mutedSchedules || [], (tl as any).mutedSegments || [], preset.segments, {
+          activePresetId: preset.id,
+          activePresetName: preset.name,
+          soundsBySegment: nextMap,
+        });
+      } catch {}
+      setSoundsBySegment(nextMap);
+    } catch {}
+  };
+
+  const persistUpdateInActivePreset = async (oldTimeHHmmss: string, newTimeHHmm: string) => {
+    if (!presetInfo?.id) return;
+    try {
+      const lists = await presetsList();
+      const preset = (lists.presets || []).find(p => p.id === presetInfo.id);
+      if (!preset) return;
+      const oldHHmm = oldTimeHHmmss.slice(0,5);
+      const oldSeg = timelineSegments.find(s => isTimeInRange(oldHHmm, s.startTime, s.endTime));
+      const newSeg = timelineSegments.find(s => isTimeInRange(newTimeHHmm, s.startTime, s.endTime));
+      if (!newSeg) return;
+      const existingMap = (preset as any).soundsBySegment as Record<string, Array<string | { id: string; time?: string }>> || {};
+      const mapCopy: Record<string, Array<string | { id: string; time?: string }>> = { ...existingMap };
+      if (oldSeg) {
+        const arr = (mapCopy[oldSeg.id] || []).map(x => (typeof x === 'string' ? { id: x } : x));
+        const normalizedOld = oldTimeHHmmss.length === 5 ? `${oldTimeHHmmss}:00` : oldTimeHHmmss;
+        mapCopy[oldSeg.id] = arr.filter(x => !(x.id === soundId && (x.time || '') === normalizedOld));
+      }
+      const normalizedNew = newTimeHHmm.length === 5 ? `${newTimeHHmm}:00` : newTimeHHmm;
+      const dest = (mapCopy[newSeg.id] || []).map(x => (typeof x === 'string' ? { id: x } : x));
+      if (!dest.some(x => x.id === soundId && (x.time || '') === normalizedNew)) dest.push({ id: soundId, time: normalizedNew });
+      mapCopy[newSeg.id] = dest;
+      await presetsUpsert({ id: preset.id, name: preset.name, segments: preset.segments, soundsBySegment: mapCopy });
+      try {
+        const tl = await timelineGet();
+        const tlSegments = (tl as any).segments as Array<{ id: string; title: string; startTime: string; endTime: string }> | undefined;
+        await timelineSave((tl as any).mutedSchedules || [], (tl as any).mutedSegments || [], tlSegments, {
+          activePresetId: preset.id,
+          activePresetName: preset.name,
+          soundsBySegment: mapCopy,
+        });
+        window.dispatchEvent(new CustomEvent('timeline:updated')); // Dispatch global event
+      } catch {}
+      setSoundsBySegment(mapCopy);
+    } catch {}
+  };
+
+  // Load active preset meta + mapping on mount to show badges per schedule
+  useEffect(() => {
+    (async () => {
+      try {
+        const data = await timelineGet();
+        const name = (data as any).activePresetName || null;
+        const id = (data as any).activePresetId || null;
+        setPresetInfo({ id, name });
+        if ((data as any).segments) {
+          setTimelineSegments(((data as any).segments || []) as Array<{ id: string; title: string; startTime: string; endTime: string }>);
+        }
+        if ((data as any).soundsBySegment) {
+          setSoundsBySegment((data as any).soundsBySegment as Record<string, Array<string | { id: string; time?: string }>>);
+        }
+      } catch {}
+    })();
+  }, []);
+
+  const isTimeInRange = (t: string, start: string, end: string) => {
+    const tt = t.length === 5 ? `${t}:00` : t;
+    return tt >= start && tt <= end;
+  };
+
+  const scheduleBadge = (time: string): { segment?: string; preset?: string } | null => {
+    if (!presetInfo?.name || !timelineSegments.length) return null;
+    const seg = timelineSegments.find(s => isTimeInRange(time, s.startTime, s.endTime));
+    if (!seg) return null;
+    const raw = soundsBySegment[seg.id];
+    if (!Array.isArray(raw)) return null; // no limit -> not explicitly from preset
+    const allowedIds = new Set(raw.map(x => (typeof x === 'string' ? x : x.id)));
+    if (!allowedIds.has(soundId)) return null;
+    return { segment: seg.title, preset: presetInfo.name };
+  };
+
+  // removed legacy importFromPreset
+
   const handleUpdateSchedule = async (scheduleId: string, time: string, active: boolean) => {
     if (!isSubmitting) {
       try {
         setIsSubmitting(true);
-        await updateSchedule(soundId, scheduleId, time + ':00', active); // Add seconds
+        const full = time.length === 5 ? `${time}:00` : time; // normalize HH:mm -> HH:mm:ss
+        await updateSchedule(soundId, scheduleId, full, active);
+        // Persist change into active preset mapping: find old time by id and update
+        const old = (schedules || []).find(s => s.id === scheduleId);
+        if (old) {
+          await persistUpdateInActivePreset(old.time, time);
+        }
         if (editingId === scheduleId) {
           setEditingId(null);
           setEditTime('');
@@ -83,6 +232,9 @@ const ScheduleEditor: React.FC<ScheduleEditorProps> = ({
       </div>
       
       <div className="mb-4">
+        {presetInfo?.name && (
+          <div className="mb-2 text-xs text-[#C1C2C5] opacity-80">Aktives Preset: <span className="text-[#4ECBD9]">{presetInfo.name}</span></div>
+        )}
         <form onSubmit={handleAddSchedule} className="space-y-2">
           <div className="flex items-center space-x-2">
             <input
@@ -116,9 +268,13 @@ const ScheduleEditor: React.FC<ScheduleEditorProps> = ({
         </form>
       </div>
       
-      {schedules.length > 0 ? (
+      {(() => {
+        const filtered = schedules.filter(s => !!scheduleBadge(s.time));
+        const show = (Object.keys(soundsBySegment).length > 0) ? filtered : schedules;
+        const sorted = [...show].sort((a, b) => (a.time || '').localeCompare(b.time || ''));
+        return sorted.length > 0 ? (
         <ul className="space-y-2">
-          {schedules.map(schedule => (
+          {sorted.map(schedule => (
             <li 
               key={schedule.id}
               className="flex items-center justify-between border border-neutral-700 rounded-lg p-3 bg-neutral-800/50"
@@ -163,6 +319,12 @@ const ScheduleEditor: React.FC<ScheduleEditorProps> = ({
               </div>
               
               <div className="flex items-center space-x-3">
+                {/* Preset badge */}
+                {(() => { const badge = scheduleBadge(schedule.time); return badge ? (
+                  <div className="text-[10px] px-2 py-0.5 rounded-full bg-neutral-700/60 border border-neutral-600 text-[#C1C2C5]">
+                    {badge.preset} • {badge.segment}
+                  </div>
+                ) : null; })()}
                 <label className="inline-flex items-center cursor-pointer">
                   <input 
                     type="checkbox" 
@@ -179,7 +341,7 @@ const ScheduleEditor: React.FC<ScheduleEditorProps> = ({
                 </label>
                 
                 <button
-                  onClick={() => deleteSchedule(soundId, schedule.id)}
+                  onClick={async () => { await deleteSchedule(soundId, schedule.id); await persistRemoveFromActivePreset(schedule.time); }}
                   className="p-1 text-neutral-400 hover:text-[#F471B5] transition-colors"
                   disabled={isSubmitting}
                 >
@@ -192,10 +354,10 @@ const ScheduleEditor: React.FC<ScheduleEditorProps> = ({
       ) : (
         <div className="text-center py-4 bg-gray-800/30 rounded-lg">
           <p className="text-sm text-gray-400">
-            No schedules yet. Add your first one above.
+            {Object.keys(soundsBySegment).length > 0 ? 'Keine Zeiten im aktiven Preset.' : 'No schedules yet. Add your first one above.'}
           </p>
         </div>
-      )}
+      );})()}
     </div>
   );
 };

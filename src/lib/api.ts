@@ -204,12 +204,15 @@ export async function presetsList() {
   return apiGet<{ presets: TimelinePreset[] }>(`/presets.php?action=list`);
 }
 
-export async function presetsUpsert(preset: TimelinePreset) {
+export async function presetsUpsert(preset: TimelinePreset & { soundsBySegment?: Record<string, Array<string | { id: string; time?: string }>> }) {
   const form = new FormData();
   form.append('id', preset.id);
   form.append('name', preset.name);
   form.append('segments', JSON.stringify(preset.segments));
-  return apiPost<{ ok: true; preset: TimelinePreset }>(`/presets.php?action=upsert`, form);
+  if (preset.soundsBySegment) {
+    form.append('soundsBySegment', JSON.stringify(preset.soundsBySegment));
+  }
+  return apiPost<{ ok: true; preset: any }>(`/presets.php?action=upsert`, form);
 }
 
 export async function presetsDelete(id: string) {
@@ -220,14 +223,25 @@ export async function presetsDelete(id: string) {
 
 // Timeline state (e.g., mutedSchedules)
 export async function timelineGet() {
-  return apiGet<{ mutedSchedules: string[]; mutedSegments: string[] }>(`/timeline.php?action=get`);
+  return apiGet<{ mutedSchedules: string[]; mutedSegments: string[]; segments?: Array<{ id: string; title: string; startTime: string; endTime: string }>; activePresetId?: string | null; activePresetName?: string | null; soundsBySegment?: Record<string, Array<string | { id: string; time?: string }>> }>(`/timeline.php?action=get`);
 }
 
-export async function timelineSave(mutedSchedules: string[], mutedSegments: string[]) {
+export async function timelineSave(
+  mutedSchedules: string[],
+  mutedSegments: string[],
+  segments?: Array<{ id: string; title: string; startTime: string; endTime: string }>,
+  opts?: { activePresetId?: string; activePresetName?: string; soundsBySegment?: Record<string, Array<string | { id: string; time?: string }>> }
+) {
   const form = new FormData();
   form.append('mutedSchedules', JSON.stringify(mutedSchedules));
   form.append('mutedSegments', JSON.stringify(mutedSegments));
-  return apiPost<{ ok: true; mutedSchedules: string[]; mutedSegments: string[] }>(`/timeline.php?action=save`, form);
+  if (segments) {
+    form.append('segments', JSON.stringify(segments));
+  }
+  if (opts?.activePresetId !== undefined) form.append('activePresetId', opts.activePresetId ?? '');
+  if (opts?.activePresetName !== undefined) form.append('activePresetName', opts.activePresetName ?? '');
+  if (opts?.soundsBySegment) form.append('soundsBySegment', JSON.stringify(opts.soundsBySegment));
+  return apiPost<{ ok: true; mutedSchedules: string[]; mutedSegments: string[]; segments?: any; activePresetId?: string | null; activePresetName?: string | null; soundsBySegment?: Record<string, string[]> }>(`/timeline.php?action=save`, form);
 }
 
 // --- Remote control (no supabase) ---
