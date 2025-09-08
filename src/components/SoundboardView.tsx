@@ -141,7 +141,7 @@ const SoundboardView: React.FC = () => {
         <div className="flex flex-wrap gap-2">
           <button
             onClick={() => setFilterCat('')}
-            className={`px-3 py-1.5 rounded-full text-xs border ${filterCat === '' ? 'bg-[#4ECBD9]/10 text-[#4ECBD9] border-[#4ECBD9]/30' : 'bg-neutral-800 text-[#C1C2C5] border-neutral-700 hover:bg-neutral-700'}`}
+            className={`appearance-none p-0 inline-flex items-center justify-center min-h-[24px] h-[24px] px-4 rounded-full text-[12px] sm:text-sm border leading-none ${filterCat === '' ? 'bg-[#0d1718] text-[#4ECBD9] border-transparent ring-1 ring-[#4ECBD9]/40' : 'bg-neutral-800 text-[#C1C2C5] border-neutral-700 hover:bg-neutral-700'}`}
           >
             Alle
           </button>
@@ -149,7 +149,7 @@ const SoundboardView: React.FC = () => {
             <button
               key={c.id}
               onClick={() => setFilterCat(c.id)}
-              className={`px-3 py-1.5 rounded-full text-xs border ${filterCat === c.id ? 'bg-[#4ECBD9]/10 text-[#4ECBD9] border-[#4ECBD9]/30' : 'bg-neutral-800 text-[#C1C2C5] border-neutral-700 hover:bg-neutral-700'}`}
+              className={`appearance-none p-0 inline-flex items-center justify-center min-h-[24px] h-[24px] px-4 rounded-full text-[12px] sm:text-sm border leading-none ${filterCat === c.id ? 'bg-[#0d1718] text-[#4ECBD9] border-transparent ring-1 ring-[#4ECBD9]/40' : 'bg-neutral-800 text-[#C1C2C5] border-neutral-700 hover:bg-neutral-700'}`}
             >
               <span className="inline-flex items-center gap-2">
                 <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ backgroundColor: colorFor(c.id || c.name) }} />
@@ -160,7 +160,7 @@ const SoundboardView: React.FC = () => {
         </div>
         <button
           onClick={() => setCatOpen(true)}
-          className="p-2 rounded-lg border border-neutral-700 text-neutral-300 hover:bg-neutral-700/50"
+          className="w-9 h-9 flex items-center justify-center rounded-lg border border-neutral-700 text-neutral-300 hover:bg-neutral-700/50"
           title="Kategorien verwalten"
         >
           <Settings className="w-4 h-4" />
@@ -238,7 +238,14 @@ const SoundboardView: React.FC = () => {
                               categories={categories}
                               colorFor={colorFor}
                               currentTimeSeconds={currentTimeSeconds}
-                              onPlay={() => { if (currentlyPlaying === sound.id) pauseSound(); else playSound(sound.id); }}
+                              onPlay={() => {
+                                if (currentlyPlaying === sound.id) {
+                                  pauseSound();
+                                } else {
+                                  if (currentlyPlaying && currentlyPlaying !== sound.id) pauseSound();
+                                  playSound(sound.id);
+                                }
+                              }}
                               onToggleFavorite={() => toggleFavorite(sound.id)}
                               onToggleHidden={() => toggleHiddenCategory(sound.id)}
                             />
@@ -294,7 +301,14 @@ const SoundboardView: React.FC = () => {
                       categories={categories}
                       colorFor={colorFor}
                       currentTimeSeconds={currentTimeSeconds}
-                      onPlay={() => { if (currentlyPlaying === sound.id) pauseSound(); else playSound(sound.id); }}
+                      onPlay={() => {
+                        if (currentlyPlaying === sound.id) {
+                          pauseSound();
+                        } else {
+                          if (currentlyPlaying && currentlyPlaying !== sound.id) pauseSound();
+                          playSound(sound.id);
+                        }
+                      }}
                       onToggleFavorite={() => toggleFavorite(sound.id)}
                       onToggleHidden={() => toggleHiddenCategory(sound.id)}
                     />
@@ -361,14 +375,17 @@ const SortableCard: React.FC<CardProps> = ({ id, ...rest }) => {
 
 const CardContent: React.FC<Omit<CardProps, 'id'>> = ({ sound, isActive, categories, colorFor, onPlay, onToggleFavorite, onToggleHidden, currentTimeSeconds }) => {
   return (
-    <div className={`bg-white/10 backdrop-blur-sm rounded-lg overflow-hidden hover:bg-white/20 transition-all shadow-lg touch-manipulation ${
+    <div
+      onClick={onPlay}
+      className={`cursor-pointer bg-white/10 backdrop-blur-sm rounded-lg overflow-hidden hover:bg-white/20 transition-all shadow-lg touch-manipulation ${
       isActive ? 'ring-1 ring-[#4ECBD9] shadow-[#4ECBD9]/10' : ''
-    }`}>
+    }`}
+    >
       <div className="p-4">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-1.5">
             <button
-              onClick={onToggleFavorite}
+              onClick={(e) => { e.stopPropagation(); onToggleFavorite(); }}
               className="p-1.5 rounded-full hover:bg-black/10 transition-colors"
               title={sound.isFavorite ? 'Favorit entfernen' : 'Zu Favoriten hinzufügen'}
             >
@@ -381,7 +398,7 @@ const CardContent: React.FC<Omit<CardProps, 'id'>> = ({ sound, isActive, categor
               />
             </button>
             <button
-              onClick={onToggleHidden}
+              onClick={(e) => { e.stopPropagation(); onToggleHidden(); }}
               className="p-1.5 rounded-full hover:bg-black/10 transition-colors"
               title={sound.categoryId && (categories.find(c=>c.id===sound.categoryId)?.name?.toLowerCase()==='ausgeblendet') ? 'Aus "Ausgeblendet" entfernen' : 'In "Ausgeblendet" verschieben'}
             >
@@ -394,7 +411,7 @@ const CardContent: React.FC<Omit<CardProps, 'id'>> = ({ sound, isActive, categor
               />
             </button>
           </div>
-          <div className="p-1.5 rounded-full hover:bg-black/10 transition-colors cursor-grab active:cursor-grabbing">
+          <div className="p-1.5 rounded-full hover:bg-black/10 transition-colors cursor-grab active:cursor-grabbing" onClick={(e)=>e.stopPropagation()}>
             <GripHorizontal className="h-4 w-4 text-[#909296]" />
           </div>
         </div>
@@ -415,8 +432,8 @@ const CardContent: React.FC<Omit<CardProps, 'id'>> = ({ sound, isActive, categor
               );
             })()}
             <button
-              onClick={onPlay}
-              className={`absolute inset-0 m-auto w-10 h-10 flex items-center justify-center rounded-full transition-colors ${
+              onClick={(e)=>e.preventDefault()}
+              className={`pointer-events-none absolute inset-0 m-auto w-10 h-10 flex items-center justify-center rounded-full transition-colors ${
                 isActive ? 'bg-[#4ECBD9]/20 text-[#4ECBD9]' : 'bg-[#4ECBD9]/10 text-[#4ECBD9] hover:bg-[#4ECBD9]/20'
               }`}
               aria-label={isActive ? 'Pause' : 'Abspielen'}

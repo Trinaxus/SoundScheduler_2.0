@@ -100,14 +100,14 @@ const TimelineView: React.FC = () => {
       <div className="flex justify-end mb-4 gap-2">
         <button
           onClick={() => setShowPresetManager(true)}
-          className="p-2 rounded-lg border border-neutral-700 text-neutral-300 hover:bg-neutral-700/50"
+          className="w-9 h-9 flex items-center justify-center rounded-lg border border-neutral-700 text-neutral-300 hover:bg-neutral-700/50"
           title="Timeline-Presets verwalten"
         >
           <Settings className="w-4 h-4" />
         </button>
         <button
           onClick={handleGlobalAdd}
-          className="p-2 rounded-lg bg-[#4ECBD9]/10 text-[#4ECBD9] hover:bg-[#4ECBD9]/20 transition-colors"
+          className="w-9 h-9 flex items-center justify-center rounded-lg bg-[#4ECBD9]/10 text-[#4ECBD9] hover:bg-[#4ECBD9]/20 transition-colors"
           title="Sound einplanen"
         >
           <Plus className="h-5 w-5" />
@@ -145,7 +145,7 @@ const TimelineView: React.FC = () => {
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => toggleSegmentMute(segment.id)}
-                  className={`p-2 rounded-full ${
+                  className={`w-9 h-9 flex items-center justify-center rounded-full ${
                     mutedSegments.has(segment.id)
                       ? 'bg-[#F87171]/10 text-[#F87171]'
                       : 'bg-neutral-700 text-[#C1C2C5] hover:bg-neutral-600'
@@ -165,39 +165,73 @@ const TimelineView: React.FC = () => {
               <div className="border-t border-neutral-700/50 p-4">
                 <div className="space-y-2">
                   {items.map(schedule => (
-                    <div
-                      key={schedule.id}
-                      className="p-3 rounded-lg bg-neutral-700/30"
-                    >
-                      <div className="flex items-center justify-between">
+                    <div key={schedule.id} className="p-3 rounded-lg bg-neutral-700/30">
+                      {/* Mobile: top bar */}
+                      <div className="flex items-center justify-between sm:hidden mb-2">
+                        <button
+                          onClick={() => handlePlaySound(schedule.soundId, schedule.id, segment.id)}
+                          title={(mutedSegments.has(segment.id) || mutedSchedules.has(schedule.id)) ? 'Stummgeschaltet – wirkt nur auf die zeitgesteuerte Wiedergabe' : 'Abspielen/Pausieren'}
+                          className={`w-9 h-9 flex items-center justify-center rounded-full ${
+                            (currentlyPlaying === schedule.soundId && activeSchedule === schedule.id)
+                              ? 'bg-[#4ECBD9]/20 text-[#4ECBD9]'
+                              : 'bg-[#4ECBD9]/10 text-[#4ECBD9] hover:bg-[#4ECBD9]/20'
+                          }`}
+                        >
+                          {currentlyPlaying === schedule.soundId && activeSchedule === schedule.id ? (
+                            <Pause className="h-4 w-4" />
+                          ) : (
+                            <Play className="h-4 w-4" />
+                          )}
+                        </button>
+                        <div className="flex items-center space-x-2">
+                          <button
+                            onClick={() => toggleMute(schedule.id)}
+                            className={`w-9 h-9 flex items-center justify-center rounded-full ${
+                              mutedSchedules.has(schedule.id) ? 'bg-[#F87171]/10 text-[#F87171]' : 'bg-neutral-700 text-[#909296]'}
+                            `}
+                            title={mutedSchedules.has(schedule.id) ? 'Eintrag stumm' : 'Eintrag entstummen'}
+                          >
+                            {mutedSchedules.has(schedule.id) ? <VolumeX className="h-4 w-4" /> : <Volume1 className="h-4 w-4" />}
+                          </button>
+                          <span className={`px-2 py-1 text-xs rounded-full ${schedule.active ? 'bg-[#4ECBD9]/10 text-[#4ECBD9]' : 'bg-neutral-700 text-[#909296]'}`}>
+                            {schedule.active ? 'Aktiv' : 'Inaktiv'}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Mobile: full width text */}
+                      <div className="sm:hidden">
+                        <div className="flex items-center">
+                          <p className="text-sm font-medium text-[#C1C2C5] break-words whitespace-normal">
+                            {schedule.soundName}
+                          </p>
+                          {schedule.isFavorite && <Star className="h-3 w-3 ml-1 fill-[#F471B5] text-[#F471B5]" />}
+                        </div>
+                        <div className="mt-1 flex items-center space-x-2 text-xs">
+                          <span className="text-[#F471B5]">{formatTime(schedule.time)}</span>
+                          <span className="text-[#909296]">•</span>
+                          <span className="text-[#909296]">{formatDuration(schedule.duration)}</span>
+                        </div>
+                      </div>
+
+                      {/* Desktop/tablet: previous horizontal layout */}
+                      <div className="hidden sm:flex items-center justify-between">
                         <div className="flex items-center gap-3 min-w-0">
                           <button
                             onClick={() => handlePlaySound(schedule.soundId, schedule.id, segment.id)}
-                            title={
-                              (mutedSegments.has(segment.id) || mutedSchedules.has(schedule.id))
-                                ? 'Stummgeschaltet – wirkt nur auf die zeitgesteuerte Wiedergabe'
-                                : 'Abspielen/Pausieren'
-                            }
-                            className={`p-2 rounded-full ${
+                            title={(mutedSegments.has(segment.id) || mutedSchedules.has(schedule.id)) ? 'Stummgeschaltet – wirkt nur auf die zeitgesteuerte Wiedergabe' : 'Abspielen/Pausieren'}
+                            className={`w-9 h-9 flex items-center justify-center rounded-full ${
                               (currentlyPlaying === schedule.soundId && activeSchedule === schedule.id)
                                 ? 'bg-[#4ECBD9]/20 text-[#4ECBD9]'
                                 : 'bg-[#4ECBD9]/10 text-[#4ECBD9] hover:bg-[#4ECBD9]/20'
                             }`}
                           >
-                            {currentlyPlaying === schedule.soundId && activeSchedule === schedule.id ? (
-                              <Pause className="h-4 w-4" />
-                            ) : (
-                              <Play className="h-4 w-4" />
-                            )}
+                            {currentlyPlaying === schedule.soundId && activeSchedule === schedule.id ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
                           </button>
                           <div className="min-w-0">
                             <div className="flex items-center">
-                              <p className="text-sm font-medium text-[#C1C2C5] truncate">
-                                {schedule.soundName}
-                              </p>
-                              {schedule.isFavorite && (
-                                <Star className="h-3 w-3 ml-1 fill-[#F471B5] text-[#F471B5]" />
-                              )}
+                              <p className="text-sm font-medium text-[#C1C2C5] truncate">{schedule.soundName}</p>
+                              {schedule.isFavorite && <Star className="h-3 w-3 ml-1 fill-[#F471B5] text-[#F471B5]" />}
                             </div>
                             <div className="flex items-center space-x-2 text-xs">
                               <span className="text-[#F471B5]">{formatTime(schedule.time)}</span>
@@ -206,30 +240,11 @@ const TimelineView: React.FC = () => {
                             </div>
                           </div>
                         </div>
-
                         <div className="flex items-center space-x-2 ml-3">
-                          <button
-                            onClick={() => toggleMute(schedule.id)}
-                            className={`p-1.5 rounded-full transition-colors ${
-                              mutedSchedules.has(schedule.id)
-                                ? 'bg-[#F87171]/10 text-[#F87171]'
-                                : 'bg-neutral-700 text-[#909296] hover:text-[#C1C2C5]'
-                            }`}
-                          >
-                            {mutedSchedules.has(schedule.id) ? (
-                              <VolumeX className="h-4 w-4" />
-                            ) : (
-                              <Volume1 className="h-4 w-4" />
-                            )}
+                          <button onClick={() => toggleMute(schedule.id)} className={`w-9 h-9 flex items-center justify-center rounded-full transition-colors ${mutedSchedules.has(schedule.id) ? 'bg-[#F87171]/10 text-[#F87171]' : 'bg-neutral-700 text-[#909296] hover:text-[#C1C2C5]'}`}>
+                            {mutedSchedules.has(schedule.id) ? <VolumeX className="h-4 w-4" /> : <Volume1 className="h-4 w-4" />}
                           </button>
-                          
-                          <span className={`px-2 py-1 text-xs rounded-full ${
-                            schedule.active
-                              ? 'bg-[#4ECBD9]/10 text-[#4ECBD9]'
-                              : 'bg-neutral-700 text-[#909296]'
-                          }`}>
-                            {schedule.active ? 'Aktiv' : 'Inaktiv'}
-                          </span>
+                          <span className={`px-2 py-1 text-xs rounded-full ${schedule.active ? 'bg-[#4ECBD9]/10 text-[#4ECBD9]' : 'bg-neutral-700 text-[#909296]'}`}>{schedule.active ? 'Aktiv' : 'Inaktiv'}</span>
                         </div>
                       </div>
                     </div>
