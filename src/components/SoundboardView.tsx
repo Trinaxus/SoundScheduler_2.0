@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { GripHorizontal, Star, Clock, Play, Pause, Music, Settings } from 'lucide-react';
+import { GripHorizontal, Star, Clock, Play, Pause, Music, Settings, Search } from 'lucide-react';
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, DragOverlay } from '@dnd-kit/core';
 import { SortableContext, rectSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -23,6 +23,7 @@ const SoundboardView: React.FC<{ mode?: SoundboardMode }> = ({ mode = 'normal' }
   
   const [sounds, setSounds] = useState<Sound[]>([]);
   const [filterCat, setFilterCat] = useState<string>('');
+  const [search, setSearch] = useState<string>('');
   // no hover index needed with dnd-kit overlay/strategy
   const [catOpen, setCatOpen] = useState<boolean>(false);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -137,6 +138,19 @@ const SoundboardView: React.FC<{ mode?: SoundboardMode }> = ({ mode = 'normal' }
 
   return (
     <>
+      {/* Search */}
+      <div className="mb-3">
+        <div className="relative max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Suche Jingles..."
+            className="w-full pl-9 pr-3 py-2 rounded-lg bg-neutral-700/50 border border-neutral-600 text-sm text-[#C1C2C5] placeholder:text-neutral-500 focus:outline-none focus:ring-1 focus:ring-[#4ECBD9]/40"
+          />
+        </div>
+      </div>
       {/* Filter & Settings */}
       {!isRemoteFavorites && (
         <div className="flex items-center justify-between mb-4">
@@ -185,7 +199,10 @@ const SoundboardView: React.FC<{ mode?: SoundboardMode }> = ({ mode = 'normal' }
 
           // Alle-Ansicht: gruppiert nach Kategorien
           if (!filterCat || fixedCatId) {
-            const visible = sounds.filter(s => (!hiddenCatId) ? true : s.categoryId !== hiddenCatId);
+            const term = search.trim().toLowerCase();
+            const visible = sounds
+              .filter(s => (!hiddenCatId) ? true : s.categoryId !== hiddenCatId)
+              .filter(s => term ? (s.name || '').toLowerCase().includes(term) : true);
             if (fixedCatId) {
               // Only favorites section
               const favItems = visible.filter(s => s.categoryId === fixedCatId).sort((a,b)=> (a.order||0)-(b.order||0));
@@ -310,9 +327,11 @@ const SoundboardView: React.FC<{ mode?: SoundboardMode }> = ({ mode = 'normal' }
           }
 
           // Gefilterte Ansicht: wie bisher (eine Section, sortiert Favoriten zuerst)
+          const term2 = search.trim().toLowerCase();
           const list = sounds
             .filter(s => !filterCat || s.categoryId === filterCat)
             .filter(s => (!filterCat && hiddenCatId) ? s.categoryId !== hiddenCatId : true)
+            .filter(s => term2 ? (s.name || '').toLowerCase().includes(term2) : true)
             .sort((a, b) => {
               if (a.isFavorite !== b.isFavorite) return a.isFavorite ? -1 : 1;
               return (a.order || 0) - (b.order || 0);
@@ -350,7 +369,6 @@ const SoundboardView: React.FC<{ mode?: SoundboardMode }> = ({ mode = 'normal' }
                         colorFor={colorFor}
                         onPlay={() => {}}
                         onToggleFavorite={() => {}}
-                        onToggleHidden={() => {}}
                         currentTimeSeconds={currentTimeSeconds}
                       />
                     );
