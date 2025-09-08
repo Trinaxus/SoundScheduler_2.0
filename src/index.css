@@ -97,3 +97,14 @@ body::before {
 * {
   touch-action: manipulation;
 }
+
+/* Subtle pulsing glow for active timeline segment */
+@keyframes glowPulseBlue {
+  0%   { box-shadow: 0 0 6px rgba(78,203,217,0.12); }
+  50%  { box-shadow: 0 0 14px rgba(78,203,217,0.28); }
+  100% { box-shadow: 0 0 6px rgba(78,203,217,0.12); }
+}
+
+.glow-pulse-blue {
+  animation: glowPulseBlue 1.4s ease-in-out infinite;
+}

@@ -133,7 +133,7 @@ export const SoundProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const manifest = await getManifest();
       const mapped: Sound[] = (manifest.sounds || []).map((s: any) => ({
         id: s.id,
-        name: s.name,
+        name: (s.name && String(s.name).trim()) || (String(s.file_path || s.url || 'unknown').split('/').pop() || 'sound').replace(/\.[^/.]+$/, ''),
         url: s.url,
         size: s.size,
         type: s.type,
@@ -296,19 +296,16 @@ export const SoundProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       return;
     }
 
-    // If the same sound is already loaded
+    // If the same sound is already loaded: stop instead of pausing
     if (currentlyPlaying === soundId && audioElement) {
-      if (audioElement.paused) {
-        // resume
-        const playPromise = audioElement.play();
-        if (playPromise !== undefined) {
-          playPromise.catch(err => console.error('Resume error:', err));
-        }
-        setPaused(false);
-      } else {
-        // soft pause
-        pauseOnly();
-      }
+      try {
+        audioElement.pause();
+      } catch {}
+      try { audioElement.src = ''; } catch {}
+      setCurrentlyPlaying(null);
+      setAudioElement(null);
+      setPaused(false);
+      setCurrentTimeSeconds(0);
       return;
     }
 
@@ -486,19 +483,27 @@ export const SoundProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const renameSound = useCallback(async (id: string, newName: string): Promise<void> => {
     try {
-      const res = await soundsUpdate({ id, name: newName }, manifestVersion ?? undefined);
+      const res = await soundsUpdate({ id, name: newName, rename_file: true }, manifestVersion ?? undefined);
       setManifestVersion(res.version);
 
+      const updated = res.sound || null;
       setSounds(prevSounds => 
         prevSounds.map(sound => 
-          sound.id === id ? { ...sound, name: newName } : sound
+          sound.id === id 
+            ? { 
+                ...sound, 
+                name: (updated?.name && String(updated.name)) || newName, 
+                url: updated?.url ?? sound.url,
+                // keep File object placeholder but reflect path change in url usage
+              }
+            : sound
         )
       );
     } catch (error) {
       console.error('Error renaming sound:', error);
       throw error;
     }
-  }, []);
+  }, [manifestVersion]);
 
   const addSchedule = useCallback(async (soundId: string, time: string): Promise<void> => {
     try {

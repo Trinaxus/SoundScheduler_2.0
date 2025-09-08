@@ -220,30 +220,19 @@ const TimelineView: React.FC = () => {
       </div>
 
       {segments.map((segment: any) => {
-        const items = schedulesBySegment[segment.id] || [];
-        const isActive = isTimeInSegment(currentTime, segment.startTime, segment.endTime);
-        
-        return (
-          <div
-            key={segment.id}
-            className={`bg-neutral-800/50 rounded-lg overflow-hidden hover:bg-neutral-800/70 transition-all`}
-          >
-            <div className="flex items-center justify-between p-4">
-              <div className="flex items-center space-x-4">
-                <div>
-                  <h3 className="font-medium text-[#4ECBD9]">{segment.title}</h3>
-                  <div className="flex items-center text-xs text-[#909296] mt-0.5">
-                    <Clock className="h-3 w-3 mr-1" />
-                    <span>{segment.startTime.slice(0,5)}–{segment.endTime.slice(0,5)}</span>
-                  </div>
-                </div>
-                {isActive && (
-                  <span className="px-2 py-0.5 text-xs rounded-full bg-[#4ECBD9]/10 text-[#4ECBD9]">
-                    Aktuell
-                  </span>
-                )}
+        const isActiveNow = isTimeInSegment(currentTime, segment.startTime, segment.endTime);
+        const schedulesForSegment = schedulesBySegment[segment.id] || [];
 
-      
+        return (
+          <div key={segment.id} className={`bg-neutral-800/60 border rounded-xl overflow-hidden ${isActiveNow ? 'border-neutral-600 glow-pulse-blue' : 'border-neutral-700'}`}>
+            <div className="px-3 py-2 sm:px-4 sm:py-3 flex items-center justify-between">
+              <div className="flex items-center gap-2 min-w-0">
+                <h3 className="font-medium text-[#4ECBD9]">{segment.title}</h3>
+                <div className="flex items-center text-xs text-[#909296] mt-0.5">
+                  <Clock className="h-3 w-3 mr-1" />
+                  <span>{segment.startTime.slice(0,5)}–{segment.endTime.slice(0,5)}</span>
+                </div>
+
               </div>
 
               {/* Segment mute toggle */}
@@ -266,10 +255,10 @@ const TimelineView: React.FC = () => {
               </div>
             </div>
 
-            {items.length > 0 && (
+            {schedulesForSegment.length > 0 && (
               <div className="border-t border-neutral-700/50 p-4">
                 <div className="space-y-2">
-                  {items.map(schedule => (
+                  {schedulesForSegment.map((schedule: any) => (
                     <div key={schedule.id} className="p-3 rounded-lg bg-neutral-700/30">
                       {/* Mobile: top bar */}
                       <div className="flex items-center justify-between sm:hidden mb-2">

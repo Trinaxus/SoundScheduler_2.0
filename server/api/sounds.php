@@ -72,6 +72,47 @@ switch ($action) {
     $id = trim($body['id'] ?? '');
     if ($id === '') json_out(['error' => 'Missing id'], 400);
 
+    // Optional: rename underlying file if requested and name is provided
+    $renameFile = isset($body['rename_file']) ? (filter_var($body['rename_file'], FILTER_VALIDATE_BOOLEAN) || $body['rename_file'] === '1') : false;
+    if ($renameFile && isset($body['name'])) {
+      $current = manifest_read();
+      $currentSound = null;
+      foreach (($current['sounds'] ?? []) as $s) {
+        if (($s['id'] ?? '') === $id) { $currentSound = $s; break; }
+      }
+      if ($currentSound) {
+        $oldRel = (string)($currentSound['file_path'] ?? '');
+        if ($oldRel !== '') {
+          global $UPLOAD_DIR;
+          $uploadsRoot = realpath(rtrim($UPLOAD_DIR, '/')) ?: '';
+          $oldAbs = $uploadsRoot ? ($uploadsRoot . '/' . basename($oldRel)) : '';
+          $ext = pathinfo($oldAbs ?: $oldRel, PATHINFO_EXTENSION);
+          // sanitize new base name
+          $newBase = strtolower((string)$body['name']);
+          // replace spaces with dashes and strip invalid chars
+          $newBase = preg_replace('/\s+/', '-', $newBase);
+          $newBase = preg_replace('/[^a-z0-9\-_]/', '', $newBase);
+          if ($newBase === '') $newBase = 'sound';
+          $candidate = $newBase . ($ext ? ('.' . $ext) : '');
+          // ensure unique
+          $i = 1;
+          while ($uploadsRoot && file_exists($uploadsRoot . '/' . $candidate)) {
+            $candidate = $newBase . '-' . $i . ($ext ? ('.' . $ext) : '');
+            $i++;
+          }
+          if ($uploadsRoot) {
+            $newAbs = $uploadsRoot . '/' . $candidate;
+            // attempt rename
+            if (@rename($oldAbs, $newAbs)) {
+              $newRel = 'uploads/sounds/' . $candidate;
+              $body['file_path'] = $newRel;
+              $body['url'] = file_public_url($newRel);
+            }
+          }
+        }
+      }
+    }
+
     $result = manifest_write(function(array $data) use ($id, $body) {
       foreach ($data['sounds'] as &$s) {
         if ($s['id'] === $id) {
