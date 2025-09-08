@@ -1,10 +1,12 @@
 import React from 'react';
 import { Clock, LogOut } from 'lucide-react';
 import { useSounds } from '../context/SoundContext';
+import { useAuth } from '../hooks/useAuth';
 import { logout } from '../lib/api';
 
 const Header: React.FC = () => {
   const { isHost, setHostMode } = useSounds();
+  const { authenticated } = useAuth();
   const [time, setTime] = React.useState(new Date().toLocaleTimeString([], { 
     hour: '2-digit', 
     minute: '2-digit', 
@@ -74,23 +76,44 @@ const Header: React.FC = () => {
             SoundScheduler
           </h1>
 
-          {/* Host toggle + Logout */}
+          {/* Host/Remote segmented toggle + Logout */}
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => setHostMode(!isHost)}
-              className={`px-3 sm:px-4 py-2 rounded-lg border-[0.5px] transition-all touch-manipulation ${isHost ? 'bg-[#0d1718] text-[#4ECBD9] border-[#4ECBD9]/40' : 'bg-neutral-700/50 text-neutral-300 border-neutral-600/50 hover:bg-neutral-600 hover:text-white'}`}
-              title={isHost ? 'Dieses Gerät ist der Player (Host). Zum Remote-Modus wechseln.' : 'Remote-Modus: Dieses Gerät sendet nur Play/Pause an den Host. Zum Host wechseln.'}
-            >
-              <span className="text-sm font-medium">{isHost ? 'Host' : 'Remote'}</span>
-            </button>
-            <button
-              onClick={handleLogout}
-              className="flex items-center space-x-2 px-3 sm:px-4 py-2 rounded-lg border-[0.5px] border-neutral-600/50 bg-neutral-700/50 text-neutral-400 hover:bg-neutral-600 hover:text-white active:bg-neutral-500 transition-all touch-manipulation"
-              title="Abmelden"
-            >
-              <LogOut className="h-4 w-4" />
-              <span className="text-sm font-medium hidden sm:inline">Abmelden</span>
-            </button>
+            <div className="flex bg-neutral-700/40 border border-neutral-600/50 rounded-lg overflow-hidden">
+              <button
+                onClick={() => setHostMode(true)}
+                aria-pressed={isHost}
+                className={`px-3 sm:px-4 py-2 text-sm transition-colors ${
+                  isHost
+                    ? 'bg-[#0d1718] text-[#4ECBD9] ring-1 ring-[#4ECBD9]/40'
+                    : 'text-neutral-300 hover:bg-neutral-600/40'
+                }`}
+                title="Dieses Gerät als Player (Host) festlegen"
+              >
+                Host
+              </button>
+              <button
+                onClick={() => setHostMode(false)}
+                aria-pressed={!isHost}
+                className={`px-3 sm:px-4 py-2 text-sm transition-colors ${
+                  !isHost
+                    ? 'bg-[#0d1718] text-[#4ECBD9] ring-1 ring-[#4ECBD9]/40'
+                    : 'text-neutral-300 hover:bg-neutral-600/40'
+                }`}
+                title="Remote-Modus: Dieses Gerät sendet nur Play/Pause an den Host"
+              >
+                Remote
+              </button>
+            </div>
+            {authenticated && (
+              <button
+                onClick={handleLogout}
+                className="flex items-center space-x-2 px-3 sm:px-4 py-2 rounded-lg border-[0.5px] border-neutral-600/50 bg-neutral-700/50 text-neutral-400 hover:bg-neutral-600 hover:text-white active:bg-neutral-500 transition-all touch-manipulation"
+                title="Abmelden"
+              >
+                <LogOut className="h-4 w-4" />
+                <span className="text-sm font-medium hidden sm:inline">Abmelden</span>
+              </button>
+            )}
           </div>
         </div>
       </div>

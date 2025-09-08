@@ -12,12 +12,22 @@ $password = $body['password'] ?? '';
 $envUser = $_ENV['ADMIN_USERNAME'] ?? '';
 $envHash = $_ENV['ADMIN_PASSWORD_HASH'] ?? '';
 
-if ($username !== $envUser || empty($envHash) || !password_verify($password, $envHash)) {
+// Allow either the admin username, or a special 'remote' username that shares the same password
+$isAdminAttempt = strcasecmp($username, $envUser) === 0;
+$isRemoteAttempt = strcasecmp($username, 'remote') === 0;
+
+if ((!$isAdminAttempt && !$isRemoteAttempt) || empty($envHash) || !password_verify($password, $envHash)) {
   usleep(300000); // slow down brute-force
   json_out(['error' => 'Unauthorized'], 401);
 }
 
 session_regenerate_id(true);
-$_SESSION['admin'] = true;
-
-json_out(['ok' => true]);
+if ($isAdminAttempt) {
+  $_SESSION['admin'] = true;
+  $_SESSION['remote'] = false;
+  json_out(['ok' => true, 'role' => 'admin']);
+} else {
+  $_SESSION['admin'] = false;
+  $_SESSION['remote'] = true;
+  json_out(['ok' => true, 'role' => 'remote']);
+}

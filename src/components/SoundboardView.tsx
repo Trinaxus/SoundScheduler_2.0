@@ -9,7 +9,8 @@ import { formatDuration } from '../utils/helpers';
 // Cover removed: no API_BASE required
 import CategoryManagerModal from './CategoryManagerModal';
 
-const SoundboardView: React.FC = () => {
+type SoundboardMode = 'normal' | 'remoteFavorites';
+const SoundboardView: React.FC<{ mode?: SoundboardMode }> = ({ mode = 'normal' }) => {
   const { 
     sounds: originalSounds, 
     playSound,
@@ -135,38 +136,42 @@ const SoundboardView: React.FC = () => {
     );
   }
 
+  const isRemoteFavorites = mode === 'remoteFavorites';
+
   return (
     <>
       {/* Filter & Settings */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex flex-wrap gap-2">
-          <button
-            onClick={() => setFilterCat('')}
-            className={`appearance-none p-0 inline-flex items-center justify-center min-h-[24px] h-[24px] px-4 rounded-full text-[12px] sm:text-sm border leading-none ${filterCat === '' ? 'bg-[#0d1718] text-[#4ECBD9] border-transparent ring-1 ring-[#4ECBD9]/40' : 'bg-neutral-800 text-[#C1C2C5] border-neutral-700 hover:bg-neutral-700'}`}
-          >
-            Alle
-          </button>
-          {categories.map((c) => (
+      {!isRemoteFavorites && (
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex flex-wrap gap-2">
             <button
-              key={c.id}
-              onClick={() => setFilterCat(c.id)}
-              className={`appearance-none p-0 inline-flex items-center justify-center min-h-[24px] h-[24px] px-4 rounded-full text-[12px] sm:text-sm border leading-none ${filterCat === c.id ? 'bg-[#0d1718] text-[#4ECBD9] border-transparent ring-1 ring-[#4ECBD9]/40' : 'bg-neutral-800 text-[#C1C2C5] border-neutral-700 hover:bg-neutral-700'}`}
+              onClick={() => setFilterCat('')}
+              className={`appearance-none p-0 inline-flex items-center justify-center min-h-[24px] h-[24px] px-4 rounded-full text-[12px] sm:text-sm border leading-none ${filterCat === '' ? 'bg-[#0d1718] text-[#4ECBD9] border-transparent ring-1 ring-[#4ECBD9]/40' : 'bg-neutral-800 text-[#C1C2C5] border-neutral-700 hover:bg-neutral-700'}`}
             >
-              <span className="inline-flex items-center gap-2">
-                <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ backgroundColor: colorFor(c.id || c.name) }} />
-                {c.name}
-              </span>
+              Alle
             </button>
-          ))}
+            {categories.map((c) => (
+              <button
+                key={c.id}
+                onClick={() => setFilterCat(c.id)}
+                className={`appearance-none p-0 inline-flex items-center justify-center min-h-[24px] h-[24px] px-4 rounded-full text-[12px] sm:text-sm border leading-none ${filterCat === c.id ? 'bg-[#0d1718] text-[#4ECBD9] border-transparent ring-1 ring-[#4ECBD9]/40' : 'bg-neutral-800 text-[#C1C2C5] border-neutral-700 hover:bg-neutral-700'}`}
+              >
+                <span className="inline-flex items-center gap-2">
+                  <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ backgroundColor: colorFor(c.id || c.name) }} />
+                  {c.name}
+                </span>
+              </button>
+            ))}
+          </div>
+          <button
+            onClick={() => setCatOpen(true)}
+            className="w-9 h-9 flex items-center justify-center rounded-lg border border-neutral-700 text-neutral-300 hover:bg-neutral-700/50"
+            title="Kategorien verwalten"
+          >
+            <Settings className="w-4 h-4" />
+          </button>
         </div>
-        <button
-          onClick={() => setCatOpen(true)}
-          className="w-9 h-9 flex items-center justify-center rounded-lg border border-neutral-700 text-neutral-300 hover:bg-neutral-700/50"
-          title="Kategorien verwalten"
-        >
-          <Settings className="w-4 h-4" />
-        </button>
-      </div>
+      )}
 
       <DndContext
         collisionDetection={closestCenter}
@@ -178,11 +183,47 @@ const SoundboardView: React.FC = () => {
         {(() => {
           const hiddenCat = categories.find(c => (c.name || '').toLowerCase() === 'ausgeblendet');
           const hiddenCatId = hiddenCat?.id;
+          const favCat = categories.find(c => (c.name || '').toLowerCase() === 'favoriten');
+          const fixedCatId = isRemoteFavorites ? favCat?.id : undefined;
 
           // Alle-Ansicht: gruppiert nach Kategorien
-          if (!filterCat) {
+          if (!filterCat || fixedCatId) {
             const visible = sounds.filter(s => (!hiddenCatId) ? true : s.categoryId !== hiddenCatId);
-
+            if (fixedCatId) {
+              // Only favorites section
+              const favItems = visible.filter(s => s.categoryId === fixedCatId).sort((a,b)=> (a.order||0)-(b.order||0));
+              const ids = favItems.map(s=>s.id);
+              return (
+                <>
+                  <SortableContext items={ids} strategy={rectSortingStrategy}>
+                    <div className="space-y-6">
+                      <div>
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ backgroundColor: colorFor(fixedCatId || 'fav') }} />
+                          <h4 className="text-xs uppercase tracking-wide text-[#909296]">Favoriten</h4>
+                        </div>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                          {favItems.map(sound => (
+                            <SortableCard
+                              key={sound.id}
+                              id={sound.id}
+                              sound={sound}
+                              isActive={currentlyPlaying === sound.id}
+                              categories={categories}
+                              colorFor={colorFor}
+                              currentTimeSeconds={currentTimeSeconds}
+                              onPlay={() => playOrRemote(sound.id)}
+                              onToggleFavorite={() => {}}
+                              onToggleHidden={() => {}}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </SortableContext>
+                </>
+              );
+            }
             const favoriten = categories.find(c => (c.name || '').toLowerCase() === 'favoriten');
             const normalCats = categories
               .filter(c => c.id !== hiddenCatId && (!favoriten || c.id !== favoriten.id))

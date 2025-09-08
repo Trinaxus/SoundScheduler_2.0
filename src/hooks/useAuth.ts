@@ -3,6 +3,7 @@ import { me } from '../lib/api';
 
 export function useAuth() {
   const [authenticated, setAuthenticated] = useState<boolean>(false);
+  const [role, setRole] = useState<'admin' | 'remote' | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
@@ -10,8 +11,11 @@ export function useAuth() {
 
     const check = async () => {
       try {
-        const res = await me();
-        if (!cancelled) setAuthenticated(!!res.authenticated);
+        const res = await me() as any;
+        if (!cancelled) {
+          setAuthenticated(!!res.authenticated);
+          setRole((res.role as 'admin' | 'remote' | null) ?? null);
+        }
       } catch {
         if (!cancelled) setAuthenticated(false);
       } finally {
@@ -31,5 +35,5 @@ export function useAuth() {
     };
   }, []);
 
-  return { authenticated, loading };
+  return { authenticated, role, loading };
 }
