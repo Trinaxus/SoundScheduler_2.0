@@ -8,6 +8,7 @@ import { Sound } from '../types';
 import { formatDuration } from '../utils/helpers';
 // Cover removed: no API_BASE required
 import CategoryManagerModal from './CategoryManagerModal';
+import { me, logout } from '../lib/api';
 
 type SoundboardMode = 'normal' | 'remoteFavorites';
 const SoundboardView: React.FC<{ mode?: SoundboardMode }> = ({ mode = 'normal' }) => {
@@ -26,6 +27,7 @@ const SoundboardView: React.FC<{ mode?: SoundboardMode }> = ({ mode = 'normal' }
   const [search, setSearch] = useState<string>('');
   // no hover index needed with dnd-kit overlay/strategy
   const [catOpen, setCatOpen] = useState<boolean>(false);
+  const [authed, setAuthed] = useState<boolean>(false);
   const [activeId, setActiveId] = useState<string | null>(null);
 
   // Derive a stable color from a string (category id or name)
@@ -53,6 +55,18 @@ const SoundboardView: React.FC<{ mode?: SoundboardMode }> = ({ mode = 'normal' }
     const sortedSounds = [...originalSounds].sort((a, b) => (a.order || 0) - (b.order || 0));
     setSounds(sortedSounds);
   }, [originalSounds]);
+
+  useEffect(() => {
+    // Check auth status so we can show a small header with login/logout in remote mode
+    (async () => {
+      try {
+        const res = await me();
+        setAuthed(!!res?.authenticated);
+      } catch (_) {
+        setAuthed(false);
+      }
+    })();
+  }, []);
 
   const onDragStart = (event: any) => {
     setActiveId(event.active.id as string);
@@ -138,6 +152,31 @@ const SoundboardView: React.FC<{ mode?: SoundboardMode }> = ({ mode = 'normal' }
 
   return (
     <>
+      {/* Remote compact header (iPad fix): show a small sticky header with login/logout if global header is hidden */}
+      {isRemoteFavorites && (
+        <div className="sticky top-0 z-20 -mx-4 sm:mx-0 bg-neutral-900/90 backdrop-blur border-b border-neutral-800 px-4 sm:px-0 py-2">
+          <div className="flex items-center justify-between text-sm">
+            <div className="text-[#C1C2C5]">Remote</div>
+            <div className="flex items-center gap-2">
+              {!authed ? (
+                <button
+                  onClick={() => { try { window.location.href = '/'; } catch (_) {} }}
+                  className="px-2 h-7 rounded-lg border border-neutral-700 text-neutral-300 hover:bg-neutral-700/50"
+                >
+                  Zur Anmeldung
+                </button>
+              ) : (
+                <button
+                  onClick={async () => { try { await logout(); } catch (_) {} finally { try { window.location.reload(); } catch {} } }}
+                  className="px-2 h-7 rounded-lg border border-neutral-700 text-neutral-300 hover:bg-neutral-700/50"
+                >
+                  Abmelden
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
       {/* Sticky search + filters (aligned with SoundList) */}
       <div className="sticky -mx-4 sm:mx-0 top-0 z-10 bg-neutral-900/85 backdrop-blur border-b border-neutral-800 px-4 sm:px-0 pt-2 pb-2">
         <div className="flex items-start justify-between gap-3">
