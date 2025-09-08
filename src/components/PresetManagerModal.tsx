@@ -125,9 +125,14 @@ const PresetManagerModal: React.FC<Props> = ({ open, onClose, currentSegments, o
     if (selectedPreset) {
       setWorkSegments(selectedPreset.segments.map(s => ({ ...s })));
       setWorkSoundsBySegment((selectedPreset as any).soundsBySegment || {});
+      // Collapse all segments by default when a preset is selected
+      try {
+        setCollapsed(new Set(selectedPreset.segments.map(s => s.id)));
+      } catch {}
     } else {
       setWorkSegments([]);
       setWorkSoundsBySegment({});
+      setCollapsed(new Set());
     }
   }, [selectedPreset?.id]);
 
@@ -192,10 +197,13 @@ const PresetManagerModal: React.FC<Props> = ({ open, onClose, currentSegments, o
   };
 
   const addSegmentRow = () => {
+    const id = generateId();
     setWorkSegments(prev => [
       ...prev,
-      { id: generateId(), title: 'Neues Segment', startTime: '00:00:00', endTime: '00:00:00' },
+      { id, title: 'Neues Segment', startTime: '00:00:00', endTime: '00:00:00' },
     ]);
+    // Newly added segments start collapsed by default
+    setCollapsed(prev => new Set([...Array.from(prev), id]));
   };
 
   const removeSegmentRow = (idx: number) => {
@@ -333,8 +341,13 @@ const PresetManagerModal: React.FC<Props> = ({ open, onClose, currentSegments, o
                   <div key={seg.id} className="bg-neutral-800/40 rounded-lg border border-neutral-700 p-2">
                     {/* Row: collapse, title, start, end, duration, actions */}
                     <div className="grid grid-cols-12 gap-3 items-center">
-                      <button onClick={() => toggleCollapsed(seg.id)} className={`col-span-1 inline-flex items-center justify-center rounded hover:bg-neutral-700/50 transition ${isCollapsed?'rotate-[-90deg]':''}`} title={isCollapsed ? 'Aufklappen' : 'Zuklappen'}>
-                        <ChevronDown className="w-4 h-4 text-neutral-400" />
+                      <button
+                        onClick={() => toggleCollapsed(seg.id)}
+                        aria-expanded={!isCollapsed}
+                        className="col-span-1 inline-flex items-center justify-center w-8 h-8 rounded-full hover:bg-neutral-700/50 transition-colors shrink-0"
+                        title={isCollapsed ? 'Aufklappen' : 'Zuklappen'}
+                      >
+                        <ChevronDown className={`w-4 h-4 text-neutral-400 transition-transform ${isCollapsed ? '-rotate-90' : 'rotate-0'}`} />
                       </button>
                       <input
                         value={seg.title}
