@@ -14,6 +14,8 @@ import {
   categoriesInsert,
   categoriesUpdate,
   categoriesDelete,
+  timelineGet,
+  timelineSave,
 } from '../lib/api';
 
 interface SoundContextType {
@@ -22,6 +24,8 @@ interface SoundContextType {
   isGloballyEnabled: boolean;
   currentTimeSeconds: number;
   mutedSchedules: Set<string>;
+  mutedSegments: Set<string>;
+  timelineLoaded: boolean;
   addSound: (file: File) => Promise<void>;
   deleteSound: (id: string) => void;
   renameSound: (id: string, newName: string) => void;
@@ -44,6 +48,7 @@ interface SoundContextType {
   deleteCategory: (id: string) => Promise<void>;
   updateSoundOrder: (sounds: Sound[]) => Promise<void>;
   toggleScheduleMute: (scheduleId: string) => void;
+  toggleSegmentMute: (segmentId: string) => void;
 }
 
 const SUPPORTED_AUDIO_TYPES = [
@@ -106,6 +111,8 @@ export const SoundProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [isGloballyEnabled, setIsGloballyEnabled] = useState<boolean>(true);
   const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
   const [mutedSchedules, setMutedSchedules] = useState<Set<string>>(new Set());
+  const [mutedSegments, setMutedSegments] = useState<Set<string>>(new Set());
+  const [timelineLoaded, setTimelineLoaded] = useState<boolean>(false);
   const lastPlayTimestampRef = useRef<number>(0);
   const DEBOUNCE_TIME = 300; // 300ms debounce for play/pause actions
 
@@ -163,6 +170,22 @@ export const SoundProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         audioContext.close();
       }
     };
+  }, []);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const data = await timelineGet();
+        if (data) {
+          if (Array.isArray(data.mutedSchedules)) setMutedSchedules(new Set(data.mutedSchedules));
+          if (Array.isArray(data.mutedSegments)) setMutedSegments(new Set(data.mutedSegments));
+        }
+      } catch (e) {
+        // non-fatal
+        console.warn('Failed to load timeline state', e);
+      }
+      setTimelineLoaded(true);
+    })();
   }, []);
 
   const validateAudioFile = (file: File): boolean => {
@@ -341,9 +364,25 @@ export const SoundProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setMutedSchedules(prev => {
       const next = new Set(prev);
       if (next.has(scheduleId)) next.delete(scheduleId); else next.add(scheduleId);
+      // persist asynchronously
+      setTimeout(() => {
+        timelineSave(Array.from(next), Array.from(mutedSegments)).catch(() => {});
+      }, 0);
       return next;
     });
-  }, []);
+  }, [mutedSegments]);
+
+  // Toggle mute for a specific Segment ID (affects only auto-play unless UI blocks manual)
+  const toggleSegmentMute = useCallback((segmentId: string) => {
+    setMutedSegments(prev => {
+      const next = new Set(prev);
+      if (next.has(segmentId)) next.delete(segmentId); else next.add(segmentId);
+      setTimeout(() => {
+        timelineSave(Array.from(mutedSchedules), Array.from(next)).catch(() => {});
+      }, 0);
+      return next;
+    });
+  }, [mutedSchedules]);
 
   const deleteSound = useCallback(async (id: string): Promise<void> => {
     try {
@@ -593,6 +632,8 @@ export const SoundProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     isGloballyEnabled,
     currentTimeSeconds,
     mutedSchedules,
+    mutedSegments,
+    timelineLoaded,
     addSound,
     deleteSound,
     renameSound,
@@ -614,7 +655,8 @@ export const SoundProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     renameCategory,
     deleteCategory,
     updateSoundOrder,
-    toggleScheduleMute
+    toggleScheduleMute,
+    toggleSegmentMute
   };
 
   return <SoundContext.Provider value={value}>{children}</SoundContext.Provider>;

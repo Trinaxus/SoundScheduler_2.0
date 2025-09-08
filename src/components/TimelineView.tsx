@@ -15,10 +15,9 @@ const DEFAULT_SEGMENTS = [
 ];
 
 const TimelineView: React.FC = () => {
-  const { sounds, addSchedule, playSound, pauseSound, currentlyPlaying, toggleFavorite, mutedSchedules, toggleScheduleMute } = useSounds();
+  const { sounds, addSchedule, playSound, pauseSound, currentlyPlaying, toggleFavorite, mutedSchedules, toggleScheduleMute, mutedSegments, toggleSegmentMute } = useSounds();
   const [selectedTime, setSelectedTime] = useState<string>('');
   const [selectedSound, setSelectedSound] = useState<string | null>(null);
-  const [mutedSegments, setMutedSegments] = useState<Set<string>>(new Set());
   const [showSoundPicker, setShowSoundPicker] = useState(false);
   const [activeSchedule, setActiveSchedule] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -145,26 +144,7 @@ const TimelineView: React.FC = () => {
               {/* Segment mute toggle */}
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => {
-                    setMutedSegments(prev => {
-                      const copy = new Set(prev);
-                      const turningOn = !copy.has(segment.id);
-                      if (turningOn) {
-                        copy.add(segment.id);
-                        // If active schedule belongs to this segment, pause
-                        if (activeSchedule) {
-                          const isActiveInSegment = (schedulesBySegment[segment.id] || []).some((it: any) => it.id === activeSchedule);
-                          if (isActiveInSegment) {
-                            pauseSound();
-                            setActiveSchedule(null);
-                          }
-                        }
-                      } else {
-                        copy.delete(segment.id);
-                      }
-                      return copy;
-                    });
-                  }}
+                  onClick={() => toggleSegmentMute(segment.id)}
                   className={`p-2 rounded-full ${
                     mutedSegments.has(segment.id)
                       ? 'bg-[#F87171]/10 text-[#F87171]'
@@ -383,7 +363,6 @@ const TimelineView: React.FC = () => {
             endTime: s.endTime,
           }));
           setSegments(mapped);
-          setMutedSegments(new Set());
         }}
       />
     </div>

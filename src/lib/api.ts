@@ -217,3 +217,15 @@ export async function presetsDelete(id: string) {
   form.append('id', id);
   return apiPost<{ ok: true }>(`/presets.php?action=delete`, form);
 }
+
+// Timeline state (e.g., mutedSchedules)
+export async function timelineGet() {
+  return apiGet<{ mutedSchedules: string[]; mutedSegments: string[] }>(`/timeline.php?action=get`);
+}
+
+export async function timelineSave(mutedSchedules: string[], mutedSegments: string[]) {
+  const form = new FormData();
+  form.append('mutedSchedules', JSON.stringify(mutedSchedules));
+  form.append('mutedSegments', JSON.stringify(mutedSegments));
+  return apiPost<{ ok: true; mutedSchedules: string[]; mutedSegments: string[] }>(`/timeline.php?action=save`, form);
+}

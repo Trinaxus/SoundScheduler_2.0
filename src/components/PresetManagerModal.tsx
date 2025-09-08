@@ -138,6 +138,19 @@ const PresetManagerModal: React.FC<Props> = ({ open, onClose, currentSegments, o
 
   if (!open) return null;
 
+  // Helper: format duration between two HH:mm:ss times as "X h Y m"
+  const durationLabel = (start: string, end: string) => {
+    const toMinutes = (t: string) => {
+      const [hh, mm] = t.split(':').map(x => parseInt(x, 10));
+      return (hh || 0) * 60 + (mm || 0);
+    };
+    let diff = toMinutes(end) - toMinutes(start);
+    if (diff < 0) diff += 24 * 60; // wrap overnight just in case
+    const h = Math.floor(diff / 60);
+    const m = diff % 60;
+    return `${h} h ${m} m`;
+  };
+
   return (
     <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
       <div className="w-full max-w-5xl max-h-[85vh] bg-neutral-800 rounded-xl border border-neutral-700 overflow-hidden flex flex-col">
@@ -148,9 +161,9 @@ const PresetManagerModal: React.FC<Props> = ({ open, onClose, currentSegments, o
           </button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-0 flex-1 overflow-y-auto">
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-0 flex-1 overflow-y-auto">
           {/* Left: List and create */}
-          <div className="p-4 border-b md:border-b-0 md:border-r border-neutral-700">
+          <div className="p-4 border-b md:border-b-0 md:border-r border-neutral-700 md:col-span-4">
             <h4 className="text-sm font-medium text-[#C1C2C5] mb-3">Vorlagen</h4>
 
             <div className="flex items-center gap-2 mb-3">
@@ -207,8 +220,8 @@ const PresetManagerModal: React.FC<Props> = ({ open, onClose, currentSegments, o
             </ul>
           </div>
 
-          {/* Right: Edit selected */}
-          <div className="p-4">
+          {/* Right: Edit selected (wider) */}
+          <div className="p-4 md:col-span-8">
             <div className="flex items-center justify-between mb-3">
               <h4 className="text-sm font-medium text-[#C1C2C5]">Preset bearbeiten</h4>
               {selectedPreset && (
@@ -225,11 +238,11 @@ const PresetManagerModal: React.FC<Props> = ({ open, onClose, currentSegments, o
             {selectedPreset ? (
               <div className="space-y-2">
                 {workSegments.map((seg, idx) => (
-                  <div key={seg.id} className="grid grid-cols-1 sm:grid-cols-5 gap-2 bg-neutral-700/20 rounded-lg p-3 items-center">
+                  <div key={seg.id} className="grid grid-cols-1 sm:grid-cols-7 gap-2 bg-neutral-700/20 rounded-lg p-3 items-center">
                     <input
                       value={seg.title}
                       onChange={e => updateSeg(idx, { title: e.target.value })}
-                      className="bg-neutral-800 border border-neutral-700 rounded px-2 py-1 text-sm text-[#C1C2C5]"
+                      className="bg-neutral-800 border border-neutral-700 rounded px-2 py-1 text-sm text-[#C1C2C5] sm:col-span-3"
                       placeholder="Titel"
                     />
                     <input
@@ -244,7 +257,9 @@ const PresetManagerModal: React.FC<Props> = ({ open, onClose, currentSegments, o
                       onChange={e => updateSeg(idx, { endTime: e.target.value + ':00' })}
                       className="bg-neutral-800 border border-neutral-700 rounded px-2 py-1 text-sm text-[#C1C2C5]"
                     />
-                    <div className="text-xs text-neutral-400 flex items-center">{seg.startTime.slice(0,5)}–{seg.endTime.slice(0,5)}</div>
+                    <div className="inline-flex items-center text-xs text-[#4ECBD9] bg-[#4ECBD9]/10 border border-[#4ECBD9]/30 rounded-full px-2 py-0.5 shadow-[0_0_8px_rgba(78,203,217,0.15)]">
+                      {durationLabel(seg.startTime, seg.endTime)}
+                    </div>
                     <button onClick={() => removeSegmentRow(idx)} className="justify-self-end p-1 rounded hover:bg-neutral-700" title="Segment entfernen"><Trash className="w-4 h-4 text-[#F471B5]"/></button>
                   </div>
                 ))}
