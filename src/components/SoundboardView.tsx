@@ -8,7 +8,7 @@ import { Sound } from '../types';
 import { formatDuration } from '../utils/helpers';
 // Cover removed: no API_BASE required
 import CategoryManagerModal from './CategoryManagerModal';
-import { me, logout } from '../lib/api';
+// import { me, logout } from '../lib/api';
 
 type SoundboardMode = 'normal' | 'remoteFavorites';
 const SoundboardView: React.FC<{ mode?: SoundboardMode }> = ({ mode = 'normal' }) => {
@@ -27,7 +27,7 @@ const SoundboardView: React.FC<{ mode?: SoundboardMode }> = ({ mode = 'normal' }
   const [search, setSearch] = useState<string>('');
   // no hover index needed with dnd-kit overlay/strategy
   const [catOpen, setCatOpen] = useState<boolean>(false);
-  const [authed, setAuthed] = useState<boolean>(false);
+  // const [authed, setAuthed] = useState<boolean>(false);
   const [activeId, setActiveId] = useState<string | null>(null);
 
   // Derive a stable color from a string (category id or name)
@@ -56,17 +56,17 @@ const SoundboardView: React.FC<{ mode?: SoundboardMode }> = ({ mode = 'normal' }
     setSounds(sortedSounds);
   }, [originalSounds]);
 
-  useEffect(() => {
-    // Check auth status so we can show a small header with login/logout in remote mode
-    (async () => {
-      try {
-        const res = await me();
-        setAuthed(!!res?.authenticated);
-      } catch (_) {
-        setAuthed(false);
-      }
-    })();
-  }, []);
+  // useEffect(() => {
+  //   // Check auth status so we can show a small header with login/logout in remote mode
+  //   (async () => {
+  //     try {
+  //       const res = await me();
+  //       setAuthed(!!res?.authenticated);
+  //     } catch (_) {
+  //       setAuthed(false);
+  //     }
+  //   })();
+  // }, []);
 
   const onDragStart = (event: any) => {
     setActiveId(event.active.id as string);
@@ -152,40 +152,12 @@ const SoundboardView: React.FC<{ mode?: SoundboardMode }> = ({ mode = 'normal' }
 
   return (
     <>
-      {/* Remote compact header (iPad fix): show a small sticky header with login/logout if global header is hidden */}
-      {isRemoteFavorites && (
-        <div className="sticky top-0 z-30 -mx-4 sm:mx-0 bg-neutral-900/90 backdrop-blur border-b border-neutral-800 px-4 sm:px-0 py-2">
-          <div className="flex items-center justify-between text-sm">
-            <div className="text-[#C1C2C5]">Remote</div>
-            <div className="flex items-center gap-2">
-              {!authed ? (
-                <button
-                  type="button"
-                  onClick={() => { try { window.localStorage.removeItem('player_is_host'); } catch(_) {} try { window.location.assign('/'); } catch (_) {} }}
-                  onTouchStart={() => { try { window.localStorage.removeItem('player_is_host'); } catch(_) {} try { window.location.assign('/'); } catch (_) {} }}
-                  className="px-2 h-7 rounded-lg border border-neutral-700 text-neutral-300 hover:bg-neutral-700/50"
-                >
-                  Zur Anmeldung
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={async () => { try { await logout(); } catch (_) {} finally { try { window.location.reload(); } catch {} } }}
-                  onTouchStart={async () => { try { await logout(); } catch (_) {} finally { try { window.location.reload(); } catch {} } }}
-                  className="px-2 h-7 rounded-lg border border-neutral-700 text-neutral-300 hover:bg-neutral-700/50"
-                >
-                  Abmelden
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Remote compact header removed: avoid duplicate Logout and 'Remote' label */}
       {/* Sticky search + filters (aligned with SoundList) */}
       <div className="sticky -mx-4 sm:mx-0 top-0 z-10 bg-neutral-900/85 backdrop-blur border-b border-neutral-800 px-4 sm:px-0 pt-2 pb-2">
         <div className="flex items-start justify-between gap-3">
           <div className="flex flex-col gap-3 w-full sm:w-auto">
-            <div className="relative max-w-sm w-full">
+            <div className="relative w-full max-w-none xl:max-w-2xl">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
               <input
                 type="text"

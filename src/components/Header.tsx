@@ -1,5 +1,5 @@
 import React from 'react';
-import { Clock, LogOut, Menu, X } from 'lucide-react';
+import { Clock, LogOut, Menu, X, Music } from 'lucide-react';
 import { useSounds } from '../context/SoundContext';
 import { useAuth } from '../hooks/useAuth';
 import { logout } from '../lib/api';
@@ -56,8 +56,8 @@ const Header: React.FC = () => {
   };
 
   return (
-    <header className="relative z-40 bg-[#1c1917]/80 border-b-[0.5px] border-[#4ECBD9]/20 backdrop-blur-sm">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3 sm:py-4">
+    <header className="relative z-40 bg-neutral-900/85 border-b-[0.5px] border-neutral-800 backdrop-blur-sm shadow-[inset_0_-1px_0_rgba(255,255,255,0.02)]">
+      <div className="max-w-[1200px] mx-auto px-4 sm:px-6 py-3 sm:py-4">
         {/* Mobile: compact top bar */}
         <div className="flex items-center justify-between sm:hidden">
           <button
@@ -69,7 +69,10 @@ const Header: React.FC = () => {
             <Menu className="w-5 h-5" />
           </button>
           <h1 className="text-xl font-bold bg-gradient-to-r from-[#4ECBD9] to-[#F471B5] text-transparent bg-clip-text tracking-tight">
-            SoundScheduler
+            <span className="inline-flex items-center gap-2">
+              <Music className="w-5 h-5 text-[#4ECBD9]" />
+              <span>SoundScheduler</span>
+            </span>
           </h1>
           {authenticated ? (
             <button
@@ -87,7 +90,15 @@ const Header: React.FC = () => {
 
         {/* Desktop: full header */}
         <div className="hidden sm:flex items-center justify-between">
-          {/* Clock */}
+          {/* Logo/Title (now left) */}
+          <h1 className="text-4xl font-bold bg-gradient-to-r from-[#4ECBD9] to-[#F471B5] text-transparent bg-clip-text tracking-tight">
+            <span className="inline-flex items-center gap-3">
+              <Music className="w-7 h-7 text-[#4ECBD9]" />
+              <span>SoundScheduler</span>
+            </span>
+          </h1>
+
+          {/* Clock (now center) */}
           <div className="flex items-center space-x-2 bg-neutral-700/50 px-4 py-2 rounded-xl border-[0.5px] border-[#4ECBD9]/10 shadow-glow-cyan">
             <Clock className="h-4 w-4 text-[#4ECBD9]" />
             <div className="text-base font-medium font-mono tracking-wider">
@@ -99,12 +110,7 @@ const Header: React.FC = () => {
             </div>
           </div>
 
-          {/* Logo/Title */}
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-[#4ECBD9] to-[#F471B5] text-transparent bg-clip-text tracking-tight">
-            SoundScheduler
-          </h1>
-
-          {/* Host/Remote segmented toggle + Logout */}
+          {/* Host/Remote segmented toggle + Logout (right) */}
           <div className="flex items-center gap-2">
             <div className="flex bg-neutral-700/40 border border-neutral-600/50 rounded-lg overflow-hidden">
               <button
@@ -188,24 +194,18 @@ const Header: React.FC = () => {
                   !isHost ? 'bg-[#0d1718] text-[#4ECBD9] ring-1 ring-[#4ECBD9]/40' : 'text-neutral-300 hover:bg-neutral-600/40'
                 }`}
               >
-                Remote
+                <span className="sr-only">Remote</span>
               </button>
             </div>
 
             {/* (On Air toggle removed per request) */}
 
-            {/* Logout */}
-            {authenticated && (
-              <button
-                onClick={handleLogout}
-                className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg border-[0.5px] border-neutral-600/50 bg-neutral-700/50 text-neutral-400 hover:bg-neutral-600 hover:text-white active:bg-neutral-500 transition-all"
-              >
-                <LogOut className="h-4 w-4" /> Abmelden
-              </button>
-            )}
+            {/* Logout removed here to avoid duplication; header button remains */}
           </div>
         </div>
       )}
+      {/* Gradient hairline */}
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[0.5px] bg-gradient-to-r from-[#4ECBD9] via-[#F471B5] to-[#4ECBD9] opacity-60" />
     </header>
   );
 };

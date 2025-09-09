@@ -146,7 +146,7 @@ const SoundList: React.FC = () => {
       <div className="sticky -mx-4 sm:mx-0 top-0 z-10 bg-neutral-900/85 backdrop-blur border-b border-neutral-800 px-4 sm:px-0 pt-2 pb-2">
         <div className="flex items-start justify-between gap-3">
           <div className="flex flex-col gap-3 w-full sm:w-auto">
-            <div className="relative max-w-sm w-full">
+            <div className="relative w-full max-w-none xl:max-w-2xl">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
               <input
                 type="text"
