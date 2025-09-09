@@ -32,21 +32,31 @@ Die SoundScheduler-App ist ein leichtgewichtiges Scheduling- und Soundboard-Tool
 - `POST /server/api/schedules.php?action=insert|update|delete` → Schedules CRUD
 - `POST /server/api/categories.php?action=insert|update|delete` → Kategorien CRUD
 - `POST /server/api/resync.php` → Upload-Ordner scannen und fehlende Dateien ins Manifest ergänzen
-- `GET /server/api/cover.php?file=<basename>` → Cover im MP3 (ID3 APIC) extrahieren
 - `GET /server/api/me.php` → Auth-Status (Session)
 
 Alle POSTs werden als `multipart/form-data` gesendet (FormData), um CORS-Preflights zu vermeiden. Authentifizierung erfolgt per Server-Session.
 
 # Features
-- Soundliste: Umbenennen, Löschen, Größen-/Daueranzeige
+- Soundliste (kompakte Karten):
+  - Umbenennen, Löschen, Daueranzeige (Dauer in Pink)
+  - Zwei Zeilen pro Karte: 1) links Name + Edit, rechts Dauer; 2) Zeitfenster-Chips (falls vorhanden) und Aktionen (Zeitpläne, Löschen)
+  - Kategorie-Farbpunkt links vor dem Namen (kleiner Dot)
+  - Karten mit Zeitfenstern werden in einem eigenen Abschnitt „Geplant“ angezeigt und nach frühester Zeit aufsteigend sortiert; darunter Abschnitt „Ohne Zeit“
+  - Play/Pause links, vertikal mittig; schneller Wechsel zwischen Sounds stoppt den vorherigen und startet den neuen sofort
 - Timeline: Zeitpläne anlegen/anzeigen, Play aus der Timeline
 - Soundboard:
-  - Play/Pause: Ein Klick startet; erneuter Klick pausiert als Stop (Reset). Nächster Klick beginnt bei 0:00.
-  - Cover-Thumbnails (aus eingebettetem MP3-Cover)
   - Favoriten, Drag&Drop-Reihenfolge
   - Kategorien: Anlegen/Umbenennen/Löschen über Zahnrad (Modal), Sounds zuweisen, Filter-Pills über dem Grid
+- Remote-Ansicht: zeigt alle Kategorien außer „Ausgeblendet“; Filter-Pills sind auch dort sichtbar
+- Header (mobil): Hamburger-Menü mit Uhr, Host/Remote-Umschalter und Logout; kompakte Topbar
 - Resync-Button: Scannt Uploads und ergänzt fehlende Manifest-Einträge
-- Globaler Schalter (oben rechts): Bei „an“ rot leuchtend, pulsiert, Tooltip „ON AIR“
+
+# Demo / Screenshots
+- Soundliste (Geplant/Ohne Zeit), kompakte Karten, pinke Dauer, Kategorie-Dot
+- Mobiler Header mit Hamburger-Menü, Uhr, Host/Remote
+- Remote-Ansicht mit Filter-Pills (ohne „Ausgeblendet“)
+
+Hinweis: Screenshots können in `docs/` abgelegt und hier verlinkt werden (z. B. `docs/soundliste.png`).
 
 # Lokale Entwicklung
 1) Abhängigkeiten installieren
@@ -58,6 +68,20 @@ npm install
 npm run dev
 ```
 3) Frontend greift per `VITE_API_BASE` (in Projekt-`.env`) auf die PHP-API zu.
+
+## Deployment (Vercel)
+- Repository-Link: GitHub (auch private Repos unterstützt). Nach Umstellung auf „Private“ ggf. Vercel ↔ GitHub neu autorisieren (App braucht „repo“-Zugriff).
+- Build Command: `npm run build`
+- Output Directory: `dist`
+- Production Branch: `main`
+- Falls kein neuer Build nach Push: im Vercel-Project „Trigger Deploy“/„Redeploy“ auslösen und Logs prüfen.
+
+### Release/Deploy-Checkliste (Vercel)
+1) Änderungen committen und pushen auf `main`.
+2) Vercel → Project → Deployments: neuer Build sollte automatisch starten.
+3) Falls nicht: „Trigger Deploy“ klicken oder GitHub-Verknüpfung neu autorisieren (Private-Repo → App braucht „repo“-Zugriff).
+4) Build-Settings prüfen: Build `npm run build`, Output `dist`.
+5) Deployment testen über die Preview-URL und ggf. „Promote to Production“.
 
 # Server-Konfiguration
 Datei: `server/.env`
@@ -76,9 +100,7 @@ Zusätzlich kann `server/api/.htaccess` CORS-Header und OPTIONS-204 setzen (fall
 - Der Server setzt `Access-Control-Allow-Origin` nur, wenn der Origin exakt in `CORS_ALLOWED_ORIGINS` steht. Für lokale Entwicklung ggf. alle Varianten (`http://localhost:5173`, `https://localhost:5173`, `http://127.0.0.1:5173`) eintragen.
 - Das Frontend nutzt FormData für POST, um Preflights (OPTIONS) zu vermeiden.
 
-# Cover-Extraktion
-- `server/api/cover.php` liest das APIC-Frame aus ID3v2 (MP3) und liefert das Bild mit korrektem MIME-Type.
-- Falls kein Cover vorhanden ist, zeigt die UI ein Fallback-Icon.
+
 
 # Kategorien
 - CRUD über `categories.php` und Zuweisung von `category_id` in Sounds (`sounds.php`).
@@ -91,8 +113,16 @@ Zusätzlich kann `server/api/.htaccess` CORS-Header und OPTIONS-204 setzen (fall
 # Troubleshooting
 - CORS: Origin exakt in `server/.env` → `CORS_ALLOWED_ORIGINS` aufnehmen. Danach hart neu laden/Cache leeren.
 - Preflight (OPTIONS) ohne ACAO: Prüfe, ob `server/api/.htaccess` greift (Apache) oder ob `bootstrap.php` CORS-Header setzt (passender Origin nötig).
-- Cover wird nicht angezeigt: Prüfe Network-Status von `cover.php?file=...` (200/404) und `Content-Type`.
 - Resync findet Datei nicht: Prüfe `UPLOAD_DIR` in `server/.env` und Dateinamen.
+
+## Bekannte Limitationen
+- Ein gleichzeitiger Audiotrack; Start eines anderen Sounds stoppt den vorherigen.
+- Browser-Audioverhalten kann sich je nach Plattform/Autoplay-Policy unterscheiden (z. B. iOS erfordert User-Interaktion).
+
+## Häufige Admin-Tasks
+- Kategorien verwalten: Soundboard → Zahnrad → Kategorien anlegen/umbenennen/löschen, Sounds zuweisen.
+- Uploads scannen: Menü → „Uploads scannen“; ergänzt fehlende Dateien im Manifest.
+- Neu laden/Sync: Menü → „Aktualisieren“ lädt Manifest neu.
 
 # Lizenz / Hinweise
 Interne Projektbasis. Bei Bedarf ergänzen.
