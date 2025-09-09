@@ -60,6 +60,13 @@ const Header: React.FC = () => {
       <div className="max-w-[1200px] mx-auto px-4 sm:px-6 py-3 sm:py-4">
         {/* Mobile: compact top bar */}
         <div className="flex items-center justify-between sm:hidden">
+          <span className="w-9 h-9" />
+          <h1 className="text-xl font-bold bg-gradient-to-r from-[#4ECBD9] to-[#F471B5] text-transparent bg-clip-text tracking-tight">
+            <span className="inline-flex items-center gap-2">
+              <Music className="w-5 h-5 text-[#4ECBD9]" />
+              <span>SoundScheduler</span>
+            </span>
+          </h1>
           <button
             onClick={() => setMobileOpen(true)}
             onTouchStart={() => setMobileOpen(true)}
@@ -68,24 +75,16 @@ const Header: React.FC = () => {
           >
             <Menu className="w-5 h-5" />
           </button>
-          <h1 className="text-xl font-bold bg-gradient-to-r from-[#4ECBD9] to-[#F471B5] text-transparent bg-clip-text tracking-tight">
-            <span className="inline-flex items-center gap-2">
-              <Music className="w-5 h-5 text-[#4ECBD9]" />
-              <span>SoundScheduler</span>
-            </span>
-          </h1>
-          {authenticated ? (
-            <button
-              onClick={handleLogout}
-              aria-label="Abmelden"
-              className="w-9 h-9 inline-flex items-center justify-center rounded-lg border border-neutral-700 text-neutral-300 hover:bg-neutral-700/50"
-              title="Abmelden"
-            >
-              <LogOut className="h-4 w-4" />
-            </button>
-          ) : (
-            <span className="w-9 h-9" />
-          )}
+        </div>
+
+        {/* Mobile: time bar under header */}
+        <div className="sm:hidden mt-2">
+          <div className="flex items-center justify-center bg-neutral-700/40 border border-neutral-600/40 rounded-lg px-3 py-2">
+            <div className="flex items-center gap-2">
+              <Clock className="h-4 w-4 text-[#4ECBD9]" />
+              <span className="font-mono text-sm text-[#C1C2C5]">{time}</span>
+            </div>
+          </div>
         </div>
 
         {/* Desktop: full header */}
@@ -166,15 +165,7 @@ const Header: React.FC = () => {
               </button>
             </div>
 
-            {/* Clock */}
-            <div className="flex items-center justify-between bg-neutral-700/40 border border-neutral-600/40 rounded-lg px-3 py-2 mb-3">
-              <div className="flex items-center gap-2">
-                <Clock className="h-4 w-4 text-[#4ECBD9]" />
-                <span className="font-mono text-sm text-[#C1C2C5]">
-                  {time}
-                </span>
-              </div>
-            </div>
+            {/* Clock removed from menu (moved under header on mobile) */}
 
             {/* Host/Remote toggle (compact) */}
             <div className="flex bg-neutral-700/40 border border-neutral-600/50 rounded-lg overflow-hidden mb-3">
@@ -194,13 +185,21 @@ const Header: React.FC = () => {
                   !isHost ? 'bg-[#0d1718] text-[#4ECBD9] ring-1 ring-[#4ECBD9]/40' : 'text-neutral-300 hover:bg-neutral-600/40'
                 }`}
               >
-                <span className="sr-only">Remote</span>
+                Remote
               </button>
             </div>
 
             {/* (On Air toggle removed per request) */}
 
-            {/* Logout removed here to avoid duplication; header button remains */}
+            {/* Logout inside mobile menu */}
+            {authenticated && (
+              <button
+                onClick={handleLogout}
+                className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg border-[0.5px] border-neutral-600/50 bg-neutral-700/50 text-neutral-400 hover:bg-neutral-600 hover:text-white active:bg-neutral-500 transition-all"
+              >
+                <LogOut className="h-4 w-4" /> Abmelden
+              </button>
+            )}
           </div>
         </div>
       )}
