@@ -114,7 +114,12 @@ export const SoundProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [paused, setPaused] = useState<boolean>(false);
   const [currentTimeSeconds, setCurrentTimeSeconds] = useState<number>(0);
   const [categories, setCategories] = useState<{ id: string; name: string; display_order?: number }[]>([]);
-  const [isGloballyEnabled, setIsGloballyEnabled] = useState<boolean>(true);
+  const [isGloballyEnabled, setIsGloballyEnabled] = useState<boolean>(() => {
+    try {
+      const v = window.localStorage.getItem('global_enabled');
+      return v === null ? true : v === '1';
+    } catch { return true; }
+  });
   const [isHost, setIsHost] = useState<boolean>(() => {
     try {
       return window.localStorage.getItem('player_is_host') === '1';
@@ -284,6 +289,10 @@ export const SoundProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, []);
 
   const playSound = useCallback((soundId: string): void => {
+    // Respect global mute
+    if (!isGloballyEnabled) {
+      return;
+    }
     const now = Date.now();
     // Debounce only rapid repeated taps on the same sound button
     if (currentlyPlaying === soundId && (now - lastPlayTimestampRef.current < DEBOUNCE_TIME)) {
@@ -371,7 +380,7 @@ export const SoundProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       setCurrentlyPlaying(null);
       setAudioElement(null);
     }
-  }, [sounds, audioElement, currentlyPlaying]);
+  }, [sounds, audioElement, currentlyPlaying, isGloballyEnabled]);
 
   const pauseSound = useCallback((): void => {
     if (audioElement) {
@@ -407,6 +416,8 @@ export const SoundProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         if (!ts || ts <= lastRemoteTsRef.current) return;
         lastRemoteTsRef.current = ts;
         if (cancelled) return;
+        // Ignore remote play/pause when globally disabled
+        if (!isGloballyEnabled) return;
         if (action === 'play' && soundId) {
           playSound(soundId);
         } else if (action === 'pause') {
@@ -417,7 +428,7 @@ export const SoundProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
     }, 600);
     return () => { cancelled = true; clearInterval(interval); };
-  }, [isHost, playSound, pauseSound]);
+  }, [isHost, playSound, pauseSound, isGloballyEnabled]);
 
   const setHostMode = useCallback((host: boolean) => {
     setIsHost(host);
@@ -425,6 +436,8 @@ export const SoundProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, []);
 
   const playOrRemote = useCallback(async (soundId: string) => {
+    // Respect global mute on both host and remote clients
+    if (!isGloballyEnabled) return;
     if (isHost) {
       playSound(soundId);
       return;
@@ -434,7 +447,7 @@ export const SoundProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     } catch (e) {
       console.warn('Failed to send remote play', e);
     }
-  }, [isHost, playSound]);
+  }, [isHost, playSound, isGloballyEnabled]);
 
   // Toggle mute for a specific Schedule ID (affects only auto-play, not manual play)
   const toggleScheduleMute = useCallback((scheduleId: string) => {
@@ -571,7 +584,11 @@ export const SoundProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, []);
 
   const toggleGloballyEnabled = useCallback((): void => {
-    setIsGloballyEnabled(prev => !prev);
+    setIsGloballyEnabled(prev => {
+      const next = !prev;
+      try { window.localStorage.setItem('global_enabled', next ? '1' : '0'); } catch {}
+      return next;
+    });
   }, []);
 
   const markSchedulePlayed = useCallback(async (soundId: string, scheduleId: string): Promise<void> => {
