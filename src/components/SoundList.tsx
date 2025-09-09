@@ -1,11 +1,24 @@
 import React, { useEffect, useState } from 'react';
 import { Play, Pause, X, Clock, Edit, Save, Search, RefreshCw, MoreVertical } from 'lucide-react';
 import { useSounds } from '../context/SoundContext';
-import { formatFileSize, formatDuration, formatTime } from '../utils/helpers';
+import { formatDuration, formatTime } from '../utils/helpers';
 import ScheduleEditor from './ScheduleEditor';
 import SoundUploader from './SoundUploader';
 import { timelineGet, soundsResync } from '../lib/api';
 // Cover removed: no API_BASE required
+
+// Derive a stable color from a string (category id or name)
+const colorFor = (key?: string): string => {
+  if (!key) return '#9ca3af';
+  let hash = 0;
+  for (let i = 0; i < key.length; i++) {
+    hash = (hash * 31 + key.charCodeAt(i)) >>> 0;
+  }
+  const hue = hash % 360;
+  const sat = 65; // percent
+  const light = 55; // percent
+  return `hsl(${hue} ${sat}% ${light}%)`;
+};
 
 const SoundList: React.FC = () => {
   const {
@@ -116,8 +129,19 @@ const SoundList: React.FC = () => {
     .filter(s => !filterCat || s.categoryId === filterCat)
     .filter(s => term ? (s.name || '').toLowerCase().includes(term) : true);
 
+  // Group: sounds with schedules (sorted by earliest time) first, then sounds without schedules
+  const getMinTime = (s: typeof sounds[number]): string => {
+    if (!s.schedules || s.schedules.length === 0) return '99:99:99';
+    const times = s.schedules.map(x => x.time);
+    times.sort();
+    return times[0] || '99:99:99';
+  };
+  const soundsWithTimes = [...visibleSounds.filter(s => (s.schedules || []).length > 0)]
+    .sort((a, b) => getMinTime(a).localeCompare(getMinTime(b)));
+  const soundsWithoutTimes = visibleSounds.filter(s => (s.schedules || []).length === 0);
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {/* Sticky filter bar + plus button for mobile */}
       <div className="sticky -mx-4 sm:mx-0 top-0 z-10 bg-neutral-900/85 backdrop-blur border-b border-neutral-800 px-4 sm:px-0 pt-2 pb-2">
         <div className="flex items-start justify-between gap-3">
@@ -209,226 +233,261 @@ const SoundList: React.FC = () => {
         </div>
       </div>
 
-      {visibleSounds.map((sound) => (
-        <React.Fragment key={sound.id}>
-          <div className="bg-white/10 backdrop-blur-sm rounded-lg overflow-hidden hover:bg-white/20 transition-all">
-            <div className="p-3 sm:p-4">
-              {/* Mobile: top bar (play left, actions right) */}
-              <div className="flex items-center justify-between sm:hidden mb-2">
-                <div>
-                  {currentlyPlaying === sound.id ? (
-                    <button
-                      onClick={() => pauseSound()}
-                      onTouchStart={() => pauseSound()}
-                      className="p-3 bg-[#4ECBD9]/10 rounded-full text-[#4ECBD9] hover:bg-[#4ECBD9]/20 transition-colors"
-                    >
-                      <Pause className="h-5 w-5" />
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => playSound(sound.id)}
-                      onTouchStart={() => playSound(sound.id)}
-                      className="p-3 bg-[#4ECBD9]/10 rounded-full text-[#4ECBD9] hover:bg-[#4ECBD9]/20 transition-colors"
-                    >
-                      <Play className="h-5 w-5" />
-                    </button>
-                  )}
-                </div>
-                <div className="flex items-center space-x-2">
-                  <div
-                    className="flex items-center cursor-pointer"
-                    onClick={() => toggleScheduleEditor(sound.id)}
-                    onTouchStart={() => toggleScheduleEditor(sound.id)}
-                  >
-                    <div className="flex px-2 py-2 rounded-md bg-black/20">
-                      <Clock className="h-4 w-4 text-[#909296]" />
+      {/* Section: Geplant (mit Zeiten) */}
+      {soundsWithTimes.length > 0 && (
+        <div className="space-y-2">
+          <div className="text-xs uppercase tracking-wide text-[#909296] px-1">Geplant</div>
+          {soundsWithTimes.map((sound) => (
+            <React.Fragment key={sound.id}>
+              <div className="bg-white/10 backdrop-blur-sm rounded-lg overflow-hidden hover:bg-white/20 transition-all">
+                <div className="p-3">
+                  {/* Unified layout: left play, right info (2 rows) */}
+                  <div className="flex items-center gap-3">
+                    <div className="flex-shrink-0">
+                      {currentlyPlaying === sound.id ? (
+                        <button
+                          onClick={() => pauseSound()}
+                          onTouchStart={() => pauseSound()}
+                          className="h-9 w-9 inline-flex items-center justify-center rounded-full border border-[#4ECBD9]/30 text-[#4ECBD9] bg-[#4ECBD9]/10 hover:bg-[#4ECBD9]/20 transition-colors leading-none"
+                        >
+                          <Pause className="h-5 w-5 block" />
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => playSound(sound.id)}
+                          onTouchStart={() => playSound(sound.id)}
+                          className="h-9 w-9 inline-flex items-center justify-center rounded-full border border-[#4ECBD9]/30 text-[#4ECBD9] hover:bg-[#4ECBD9]/10 transition-colors leading-none"
+                        >
+                          <Play className="h-5 w-5 block transform translate-x-[0.5px]" />
+                        </button>
+                      )}
+                    </div>
+                    <div className="flex-1 text-left flex flex-col justify-center">
+                      {editingId === sound.id ? (
+                        <div className="flex items-center">
+                          <input
+                            type="text"
+                            value={editName}
+                            onChange={(e) => setEditName(e.target.value)}
+                            className="bg-black/20 rounded px-2 py-2 text-sm w-full text-[#4ECBD9]"
+                            autoFocus
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') handleSaveEdit(sound.id);
+                              if (e.key === 'Escape') setEditingId(null);
+                            }}
+                          />
+                          <button
+                            onClick={() => handleSaveEdit(sound.id)}
+                            onTouchStart={() => handleSaveEdit(sound.id)}
+                            className="ml-2 p-2 bg-[#4ECBD9]/10 text-[#4ECBD9] rounded hover:bg-[#4ECBD9]/20"
+                          >
+                            <Save className="h-4 w-4" />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-between mb-0.5">
+                          <h3 className="font-medium text-[#4ECBD9] flex items-center text-sm break-words whitespace-normal leading-snug">
+                            <span
+                              className="inline-block w-2 h-2 rounded-full mr-2"
+                              style={{ backgroundColor: sound.categoryId ? colorFor(sound.categoryId) : 'rgba(156,163,175,0.4)' }}
+                            />
+                            {sound.name}
+                            <button
+                              onClick={() => handleStartEditing(sound.id, sound.name)}
+                              onTouchStart={() => handleStartEditing(sound.id, sound.name)}
+                              className="ml-2 p-1 text-[#909296] hover:text-[#4ECBD9]"
+                            >
+                              <Edit className="h-3 w-3" />
+                            </button>
+                          </h3>
+                          <span className="text-xs text-[#F471B5] ml-3 flex-shrink-0">{formatDuration(sound.duration)}</span>
+                        </div>
+                      )}
+                      {/* Row 2: schedule chips + actions (always show actions) */}
+                      {(() => {
+                        const displayedSchedules = (Object.keys(soundsBySegment).length
+                          ? sound.schedules.filter(sch => scheduleInPreset(sound.id, sch.time))
+                          : sound.schedules);
+                        return (
+                          <div className="flex items-center justify-between mt-1">
+                            <div className={`flex flex-wrap gap-1 sm:gap-1.5 ${displayedSchedules.length === 0 ? 'min-h-[0.5rem]' : ''}`}>
+                              {displayedSchedules.map((schedule) => (
+                                <div
+                                  key={schedule.id}
+                                  className={`text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 sm:py-1 rounded ${
+                                    schedule.active
+                                      ? 'bg-[#F471B5]/10 text-[#F471B5]'
+                                      : 'bg-black/20 text-[#909296] line-through'
+                                  }`}
+                                >
+                                  {formatTime(schedule.time)}
+                                </div>
+                              ))}
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <div
+                                className="flex items-center cursor-pointer group"
+                                onClick={() => toggleScheduleEditor(sound.id)}
+                                onTouchStart={() => toggleScheduleEditor(sound.id)}
+                                title="Zeitpläne bearbeiten"
+                              >
+                                <div className="flex px-2 py-1 rounded-md bg-black/20 group-hover:bg-black/30 transition-colors">
+                                  <Clock className="h-4 w-4 text-[#909296]" />
+                                </div>
+                              </div>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const ok = window.confirm(`Soll die Datei "${sound.name}" wirklich gelöscht werden? Dieser Vorgang kann nicht rückgängig gemacht werden.`);
+                                  if (ok) deleteSound(sound.id);
+                                }}
+                                onTouchStart={(e) => {
+                                  e.stopPropagation();
+                                  const ok = window.confirm(`Soll die Datei "${sound.name}" wirklich gelöscht werden? Dieser Vorgang kann nicht rückgängig gemacht werden.`);
+                                  if (ok) deleteSound(sound.id);
+                                }}
+                                className="p-1.5 text-[#909296] hover:text-[#4ECBD9]"
+                                title="Löschen"
+                              >
+                                <X className="h-5 w-5" />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </div>
                   </div>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      const ok = window.confirm(`Soll die Datei "${sound.name}" wirklich gelöscht werden? Dieser Vorgang kann nicht rückgängig gemacht werden.`);
-                      if (ok) deleteSound(sound.id);
-                    }}
-                    onTouchStart={(e) => {
-                      e.stopPropagation();
-                      const ok = window.confirm(`Soll die Datei "${sound.name}" wirklich gelöscht werden? Dieser Vorgang kann nicht rückgängig gemacht werden.`);
-                      if (ok) deleteSound(sound.id);
-                    }}
-                    className="p-2 text-[#909296] hover:text-[#4ECBD9]"
-                  >
-                    <X className="h-5 w-5" />
-                  </button>
                 </div>
               </div>
+              {expandedSchedulerId === sound.id && (
+                <ScheduleEditor
+                  soundId={sound.id}
+                  schedules={sound.schedules}
+                  onClose={() => setExpandedSchedulerId(null)}
+                />
+              )}
+            </React.Fragment>
+          ))}
+        </div>
+      )}
 
-              {/* Mobile: full-width title and meta */}
-              <div className="sm:hidden">
-                {editingId === sound.id ? (
-                  <div className="flex items-center">
-                    <input
-                      type="text"
-                      value={editName}
-                      onChange={(e) => setEditName(e.target.value)}
-                      className="bg-black/20 rounded px-2 py-2 text-sm w-full text-[#4ECBD9]"
-                      autoFocus
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') handleSaveEdit(sound.id);
-                        if (e.key === 'Escape') setEditingId(null);
-                      }}
-                    />
-                    <button
-                      onClick={() => handleSaveEdit(sound.id)}
-                      onTouchStart={() => handleSaveEdit(sound.id)}
-                      className="ml-2 p-2 bg-[#4ECBD9]/10 text-[#4ECBD9] rounded hover:bg-[#4ECBD9]/20"
-                    >
-                      <Save className="h-4 w-4" />
-                    </button>
-                  </div>
-                ) : (
-                  <h3 className="font-medium text-[#4ECBD9] text-sm mb-1 break-words whitespace-normal leading-snug">
-                    {sound.name}
-                    <button
-                      onClick={() => handleStartEditing(sound.id, sound.name)}
-                      onTouchStart={() => handleStartEditing(sound.id, sound.name)}
-                      className="ml-2 p-1 text-[#909296] hover:text-[#4ECBD9]"
-                    >
-                      <Edit className="h-3 w-3" />
-                    </button>
-                  </h3>
-                )}
-                <div className="flex items-center text-xs text-[#909296] gap-3">
-                  <span className="hidden xs:inline">{formatFileSize(sound.size)}</span>
-                  <span>{formatDuration(sound.duration)}</span>
-                </div>
-              </div>
-
-              {/* Desktop/tablet: previous horizontal layout */}
-              <div className="hidden sm:flex items-stretch gap-4">
-                <div className="flex-shrink-0">
-                  {currentlyPlaying === sound.id ? (
-                    <button
-                      onClick={() => pauseSound()}
-                      onTouchStart={() => pauseSound()}
-                      className="p-2 bg-[#4ECBD9]/10 rounded-full text-[#4ECBD9] hover:bg-[#4ECBD9]/20 transition-colors"
-                    >
-                      <Pause className="h-5 w-5" />
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => playSound(sound.id)}
-                      onTouchStart={() => playSound(sound.id)}
-                      className="p-2 bg-[#4ECBD9]/10 rounded-full text-[#4ECBD9] hover:bg-[#4ECBD9]/20 transition-colors"
-                    >
-                      <Play className="h-5 w-5" />
-                    </button>
-                  )}
-                </div>
-                <div className="flex-1 text-left flex flex-col justify-between min-h-[56px]">
-                  {editingId === sound.id ? (
-                    <div className="flex items-center">
-                      <input
-                        type="text"
-                        value={editName}
-                        onChange={(e) => setEditName(e.target.value)}
-                        className="bg-black/20 rounded px-2 py-2 text-sm w-full text-[#4ECBD9]"
-                        autoFocus
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') handleSaveEdit(sound.id);
-                          if (e.key === 'Escape') setEditingId(null);
-                        }}
-                      />
-                      <button
-                        onClick={() => handleSaveEdit(sound.id)}
-                        onTouchStart={() => handleSaveEdit(sound.id)}
-                        className="ml-2 p-2 bg-[#4ECBD9]/10 text-[#4ECBD9] rounded hover:bg-[#4ECBD9]/20"
-                      >
-                        <Save className="h-4 w-4" />
-                      </button>
+      {/* Section: Ohne Zeit (ohne Zeiten) */}
+      {soundsWithoutTimes.length > 0 && (
+        <div className="space-y-2 mt-4">
+          <div className="text-xs uppercase tracking-wide text-[#909296] px-1">Ohne Zeit</div>
+          {soundsWithoutTimes.map((sound) => (
+            <React.Fragment key={sound.id}>
+              <div className="bg-white/10 backdrop-blur-sm rounded-lg overflow-hidden hover:bg-white/20 transition-all">
+                <div className="p-3">
+                  {/* Unified layout: left play, right info (2 rows) */}
+                  <div className="flex items-center gap-3">
+                    <div className="flex-shrink-0">
+                      {currentlyPlaying === sound.id ? (
+                        <button
+                          onClick={() => pauseSound()}
+                          onTouchStart={() => pauseSound()}
+                          className="h-9 w-9 inline-flex items-center justify-center rounded-full border border-[#4ECBD9]/30 text-[#4ECBD9] bg-[#4ECBD9]/10 hover:bg-[#4ECBD9]/20 transition-colors"
+                        >
+                          <Pause className="h-5 w-5" />
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => playSound(sound.id)}
+                          onTouchStart={() => playSound(sound.id)}
+                          className="h-9 w-9 inline-flex items-center justify-center rounded-full border border-[#4ECBD9]/30 text-[#4ECBD9] hover:bg-[#4ECBD9]/10 transition-colors"
+                        >
+                          <Play className="h-5 w-5" />
+                        </button>
+                      )}
                     </div>
-                  ) : (
-                    <h3 className="font-medium text-[#4ECBD9] flex items-center text-base mb-1 break-words whitespace-normal leading-snug">
-                      {sound.name}
-                      <button
-                        onClick={() => handleStartEditing(sound.id, sound.name)}
-                        onTouchStart={() => handleStartEditing(sound.id, sound.name)}
-                        className="ml-2 p-1 text-[#909296] hover:text-[#4ECBD9]"
-                      >
-                        <Edit className="h-3 w-3" />
-                      </button>
-                    </h3>
-                  )}
-                  <div className="flex items-center text-xs text-[#909296] gap-3">
-                    <span className="hidden xs:inline">{formatFileSize(sound.size)}</span>
-                    <span>{formatDuration(sound.duration)}</span>
-                  </div>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <div
-                    className="flex items-center cursor-pointer group"
-                    onClick={() => toggleScheduleEditor(sound.id)}
-                    onTouchStart={() => toggleScheduleEditor(sound.id)}
-                  >
-                    <div className="flex px-2 py-1 rounded-md bg-black/20 group-hover:bg-black/30 transition-colors">
-                      <Clock className="h-4 w-4 text-[#909296] mr-1" />
-                      <span className="text-xs font-medium text-[#C1C2C5]">
-                        {(() => {
-                          if (sound.schedules.length === 0) return 'Zeitplan hinzufügen';
-                          const filtered = sound.schedules.filter(sch => scheduleInPreset(sound.id, sch.time));
-                          const count = Object.keys(soundsBySegment).length ? filtered.length : sound.schedules.length;
-                          return `${count} Zeitplan${count !== 1 ? 'e' : ''}`;
-                        })()}
-                      </span>
+                    <div className="flex-1 text-left flex flex-col justify-center">
+                      {editingId === sound.id ? (
+                        <div className="flex items-center">
+                          <input
+                            type="text"
+                            value={editName}
+                            onChange={(e) => setEditName(e.target.value)}
+                            className="bg-black/20 rounded px-2 py-2 text-sm w-full text-[#4ECBD9]"
+                            autoFocus
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') handleSaveEdit(sound.id);
+                              if (e.key === 'Escape') setEditingId(null);
+                            }}
+                          />
+                          <button
+                            onClick={() => handleSaveEdit(sound.id)}
+                            onTouchStart={() => handleSaveEdit(sound.id)}
+                            className="ml-2 p-2 bg-[#4ECBD9]/10 text-[#4ECBD9] rounded hover:bg-[#4ECBD9]/20"
+                          >
+                            <Save className="h-4 w-4" />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-between mb-0.5">
+                          <h3 className="font-medium text-[#4ECBD9] flex items-center text-sm break-words whitespace-normal leading-snug">
+                            <span
+                              className="inline-block w-2 h-2 rounded-full mr-2"
+                              style={{ backgroundColor: sound.categoryId ? colorFor(sound.categoryId) : 'rgba(156,163,175,0.4)' }}
+                            />
+                            {sound.name}
+                            <button
+                              onClick={() => handleStartEditing(sound.id, sound.name)}
+                              onTouchStart={() => handleStartEditing(sound.id, sound.name)}
+                              className="ml-2 p-1 text-[#909296] hover:text-[#4ECBD9]"
+                            >
+                              <Edit className="h-3 w-3" />
+                            </button>
+                          </h3>
+                          <span className="text-xs text-[#F471B5] ml-3 flex-shrink-0">{formatDuration(sound.duration)}</span>
+                        </div>
+                      )}
+                      {/* Row 2: actions only (no schedules) */}
+                      <div className="flex items-center justify-between mt-1">
+                        <div className="min-h-[0.5rem]" />
+                        <div className="flex items-center space-x-2">
+                          <div
+                            className="flex items-center cursor-pointer group"
+                            onClick={() => toggleScheduleEditor(sound.id)}
+                            onTouchStart={() => toggleScheduleEditor(sound.id)}
+                            title="Zeitpläne bearbeiten"
+                          >
+                            <div className="flex px-2 py-1 rounded-md bg-black/20 group-hover:bg-black/30 transition-colors">
+                              <Clock className="h-4 w-4 text-[#909296]" />
+                            </div>
+                          </div>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const ok = window.confirm(`Soll die Datei \"${sound.name}\" wirklich gelöscht werden? Dieser Vorgang kann nicht rückgängig gemacht werden.`);
+                              if (ok) deleteSound(sound.id);
+                            }}
+                            onTouchStart={(e) => {
+                              e.stopPropagation();
+                              const ok = window.confirm(`Soll die Datei \"${sound.name}\" wirklich gelöscht werden? Dieser Vorgang kann nicht rückgängig gemacht werden.`);
+                              if (ok) deleteSound(sound.id);
+                            }}
+                            className="p-1.5 text-[#909296] hover:text-[#4ECBD9]"
+                            title="Löschen"
+                          >
+                            <X className="h-5 w-5" />
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      const ok = window.confirm(`Soll die Datei "${sound.name}" wirklich gelöscht werden? Dieser Vorgang kann nicht rückgängig gemacht werden.`);
-                      if (ok) deleteSound(sound.id);
-                    }}
-                    onTouchStart={(e) => {
-                      e.stopPropagation();
-                      const ok = window.confirm(`Soll die Datei "${sound.name}" wirklich gelöscht werden? Dieser Vorgang kann nicht rückgängig gemacht werden.`);
-                      if (ok) deleteSound(sound.id);
-                    }}
-                    className="p-1 text-[#909296] hover:text-[#4ECBD9]"
-                  >
-                    <X className="h-5 w-5" />
-                  </button>
                 </div>
               </div>
-            </div>
-
-            {sound.schedules.length > 0 && expandedSchedulerId !== sound.id && (
-              <div className="px-3 sm:px-4 pb-3 pt-0">
-                <div className="flex flex-wrap gap-1 sm:gap-1.5 mt-2">
-                  {(Object.keys(soundsBySegment).length ? sound.schedules.filter(sch => scheduleInPreset(sound.id, sch.time)) : sound.schedules).map((schedule) => (
-                    <div
-                      key={schedule.id}
-                      className={`text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 sm:py-1 rounded ${
-                        schedule.active
-                          ? 'bg-[#F471B5]/10 text-[#F471B5]'
-                          : 'bg-black/20 text-[#909296] line-through'
-                      }`}
-                    >
-                      {formatTime(schedule.time)}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {expandedSchedulerId === sound.id && (
-            <ScheduleEditor
-              soundId={sound.id}
-              schedules={sound.schedules}
-              onClose={() => setExpandedSchedulerId(null)}
-            />
-          )}
-        </React.Fragment>
-      ))}
+              {expandedSchedulerId === sound.id && (
+                <ScheduleEditor
+                  soundId={sound.id}
+                  schedules={sound.schedules}
+                  onClose={() => setExpandedSchedulerId(null)}
+                />
+              )}
+            </React.Fragment>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

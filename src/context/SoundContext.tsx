@@ -125,7 +125,7 @@ export const SoundProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [mutedSegments, setMutedSegments] = useState<Set<string>>(new Set());
   const [timelineLoaded, setTimelineLoaded] = useState<boolean>(false);
   const lastPlayTimestampRef = useRef<number>(0);
-  const DEBOUNCE_TIME = 300; // 300ms debounce for play/pause actions
+  const DEBOUNCE_TIME = 300; // 300ms debounce only for repeated taps on the SAME sound
   const lastRemoteTsRef = useRef<number>(0);
 
   const reloadManifest = useCallback(async (): Promise<void> => {
@@ -285,8 +285,9 @@ export const SoundProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const playSound = useCallback((soundId: string): void => {
     const now = Date.now();
-    if (now - lastPlayTimestampRef.current < DEBOUNCE_TIME) {
-      return; // Ignore rapid repeated clicks/taps
+    // Debounce only rapid repeated taps on the same sound button
+    if (currentlyPlaying === soundId && (now - lastPlayTimestampRef.current < DEBOUNCE_TIME)) {
+      return;
     }
     lastPlayTimestampRef.current = now;
 
@@ -373,12 +374,6 @@ export const SoundProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, [sounds, audioElement, currentlyPlaying]);
 
   const pauseSound = useCallback((): void => {
-    const now = Date.now();
-    if (now - lastPlayTimestampRef.current < DEBOUNCE_TIME) {
-      return; // Ignore rapid repeated clicks/taps
-    }
-    lastPlayTimestampRef.current = now;
-
     if (audioElement) {
       audioElement.pause();
       setCurrentlyPlaying(null);
