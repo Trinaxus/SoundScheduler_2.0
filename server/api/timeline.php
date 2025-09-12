@@ -17,7 +17,9 @@ if (!$authenticated) {
     exit;
 }
 
-$dataDir = dirname(__DIR__) . '/data';
+// Use DATA_DIR from bootstrap configuration to respect environment overrides
+global $DATA_DIR;
+$dataDir = rtrim($DATA_DIR, '/');
 $file = $dataDir . '/timeline.json';
 if (!is_dir($dataDir)) {
     @mkdir($dataDir, 0775, true);

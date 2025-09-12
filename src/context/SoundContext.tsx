@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { Sound, Schedule } from '../types';
-import { generateId } from '../utils/helpers';
 import {
   getManifest,
   uploadSound,
@@ -65,21 +64,9 @@ const SUPPORTED_AUDIO_TYPES = [
   'audio/x-m4a',   // .m4a (alternative MIME type)
 ];
 
-const getSoundType = (mimeType: string): 'music' | 'notification' => {
-  const notificationTypes = ['audio/wav', 'audio/x-wav'];
-  return notificationTypes.includes(mimeType) ? 'notification' : 'music';
-};
-
-const generateUniqueFilename = (originalName: string): string => {
-  const extension = originalName.split('.').pop();
-  const baseName = originalName.substring(0, originalName.lastIndexOf('.'));
-  const timestamp = Date.now();
-  const uniqueId = generateId().substring(0, 8);
-  return `${baseName}_${timestamp}_${uniqueId}.${extension}`;
-};
 
 const getAudioDuration = async (file: File): Promise<number> => {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
     const reader = new FileReader();
 

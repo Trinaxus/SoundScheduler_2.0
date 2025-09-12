@@ -88,7 +88,7 @@ export async function uploadSound(file: File) {
   return apiPost<{ name: string; url: string; file_path: string; size: number; type: string }>(`/upload.php`, form);
 }
 
-export async function soundsInsert(body: any, version?: number) {
+export async function soundsInsert(body: any, _version?: number) {
   const form = new FormData();
   Object.entries(body || {}).forEach(([k, v]) => {
     if (v !== undefined && v !== null) form.append(k, String(v));
@@ -96,7 +96,7 @@ export async function soundsInsert(body: any, version?: number) {
   return apiPost<{ version: number; sound: any }>(`/sounds.php?action=insert`, form);
 }
 
-export async function soundsUpdate(body: any, version?: number) {
+export async function soundsUpdate(body: any, _version?: number) {
   const form = new FormData();
   Object.entries(body || {}).forEach(([k, v]) => {
     if (v !== undefined) {
@@ -106,20 +106,20 @@ export async function soundsUpdate(body: any, version?: number) {
   return apiPost<{ version: number; sound: any }>(`/sounds.php?action=update`, form);
 }
 
-export async function soundsDelete(id: string, version?: number) {
+export async function soundsDelete(id: string, _version?: number) {
   const form = new FormData();
   form.append('id', id);
   return apiPost<{ version: number; ok: true }>(`/sounds.php?action=delete`, form);
 }
 
-export async function soundsReorder(orders: Array<{ id: string; display_order: number }>, version?: number) {
+export async function soundsReorder(orders: Array<{ id: string; display_order: number }>, _version?: number) {
   const form = new FormData();
   // Send as JSON string inside form to keep payload simple
   form.append('orders', JSON.stringify(orders));
   return apiPost<{ version: number; ok: true }>(`/sounds.php?action=reorder`, form);
 }
 
-export async function schedulesInsert(body: any, version?: number) {
+export async function schedulesInsert(body: any, _version?: number) {
   const form = new FormData();
   Object.entries(body || {}).forEach(([k, v]) => {
     if (v !== undefined && v !== null) form.append(k, String(v));
@@ -127,7 +127,7 @@ export async function schedulesInsert(body: any, version?: number) {
   return apiPost<{ version: number; schedule: any }>(`/schedules.php?action=insert`, form);
 }
 
-export async function schedulesUpdate(body: any, version?: number) {
+export async function schedulesUpdate(body: any, _version?: number) {
   const form = new FormData();
   Object.entries(body || {}).forEach(([k, v]) => {
     if (v !== undefined && v !== null) form.append(k, String(v));
@@ -135,7 +135,7 @@ export async function schedulesUpdate(body: any, version?: number) {
   return apiPost<{ version: number; schedule: any }>(`/schedules.php?action=update`, form);
 }
 
-export async function schedulesDelete(id: string, version?: number) {
+export async function schedulesDelete(id: string, _version?: number) {
   const form = new FormData();
   form.append('id', id);
   return apiPost<{ version: number; ok: true }>(`/schedules.php?action=delete`, form);
@@ -146,7 +146,7 @@ export async function soundsResync() {
 }
 
 // Categories CRUD
-export async function categoriesInsert(body: { name: string; display_order?: number; color?: string | null }, version?: number) {
+export async function categoriesInsert(body: { name: string; display_order?: number; color?: string | null }, _version?: number) {
   const form = new FormData();
   form.append('name', body.name);
   if (typeof body.display_order === 'number') form.append('display_order', String(body.display_order));
@@ -170,7 +170,7 @@ export async function categoriesInsert(body: { name: string; display_order?: num
   return apiPost<{ version: number; category: any }>(`/categories.php?action=insert`, form);
 }
 
-export async function categoriesUpdate(body: { id: string; name?: string; display_order?: number; color?: string | null }, version?: number) {
+export async function categoriesUpdate(body: { id: string; name?: string; display_order?: number; color?: string | null }, _version?: number) {
   const form = new FormData();
   form.append('id', body.id);
   if (typeof body.name === 'string') form.append('name', body.name);
@@ -183,7 +183,7 @@ export async function categoriesUpdate(body: { id: string; name?: string; displa
   return apiPost<{ version: number; category: any }>(`/categories.php?action=update`, form);
 }
 
-export async function categoriesDelete(id: string, version?: number) {
+export async function categoriesDelete(id: string, _version?: number) {
   const form = new FormData();
   form.append('id', id);
   return apiPost<{ version: number; ok: true }>(`/categories.php?action=delete`, form);
