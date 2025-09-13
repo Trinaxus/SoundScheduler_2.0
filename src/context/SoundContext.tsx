@@ -351,7 +351,17 @@ export const SoundProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
 
     try {
-      const url = new URL(sound.url);
+      // Temporary client-side normalization: ensure subpath '/sound.schedules.tonband' is present for this host
+      let finalUrlStr = sound.url;
+      try {
+        const u = new URL(finalUrlStr);
+        if (u.hostname === 'tonbandleipzig.de' && u.pathname.startsWith('/uploads/')) {
+          u.pathname = '/sound.schedules.tonband' + u.pathname;
+          finalUrlStr = u.toString();
+        }
+      } catch {}
+
+      const url = new URL(finalUrlStr);
       audio.src = url.toString();
       audio.load();
       setAudioElement(audio);
